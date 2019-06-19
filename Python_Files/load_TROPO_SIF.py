@@ -10,7 +10,7 @@ import psycopg2 as dbapi        # For connecting to database
 from datetime import datetime   # For converting unix time to SQL datetime
 import time                     # For timing the insertion
 import numpy as np              # For accessing the data more efficiently
-
+import sys                      # For printing status
 import os                       # For executing terminal commands
 
 SOURCE = '../TROPO_SIF_data/'   # Where to find the data
@@ -26,9 +26,12 @@ conn = dbapi.connect(host= '127.0.0.1',
 # Cursor to execute queries and read output
 cursor = conn.cursor()
 
-# Clear database first (temporary file)
+# Clear database first (temporary line)
 os.system("PGPASSWORD=frankenberg psql -U postgres -d SIF_Experiments -f \
             ../SQL_Scripts/make_SIF_tables.sql ")
+
+# Which number file we are working on
+file_num = 1
 
 # Loop over each data file in the directory 
 for file in sorted(os.listdir(SOURCE)):
@@ -55,6 +58,13 @@ for file in sorted(os.listdir(SOURCE)):
         # Total number of rows
         num_rows = len(datetimes)
 
+        # Percentage completed variable
+        progress = 0
+
+        # Notify user which file we are working on 
+        print("Inserting file %i/%i (%s)" % 
+            (file_num, len(os.listdir(SOURCE)), file))
+
         # Insert rows one-by-one
         for i in range(num_rows):
 
@@ -70,13 +80,21 @@ for file in sorted(os.listdir(SOURCE)):
                     szas[i], vzas[i], phase_angles[i], dcfs[i], 
                     lats[i], lons[i])
 
-            # Update user about insertion
-            if (i % 100000 == 0):
-                print("inserting record # %s" % str(i))
+            # Update user about insertion progress
+            sys.stdout.write('\r')
+            curr_progress = int(float(i) / float(num_rows)  * 100)
+
+            if (curr_progress != progress):
+                progress = curr_progress
+                sys.stdout.write("[%-50s] %d%%" % 
+                    ('='*int(progress/2), progress))
+                sys.stdout.flush()
 
             # Execute the command
             cursor.execute(cmd)
-    break
+    
+    # Increment file number that we are working on
+    file_num += 1
 
 # Commit all changes to the database
 conn.commit()
