@@ -4,14 +4,13 @@
 # Load all the TROPOMI SIF data from the .nc files in SOURCE
 # and import it into the specified local database 
 
-import os                       # For searching through files
+import os                       # For searching through files + executing cmd's
 import netCDF4 as nc            # For parsing data format
 import psycopg2 as dbapi        # For connecting to database
 from datetime import datetime   # For converting unix time to SQL datetime
 import time                     # For timing the insertion
 import numpy as np              # For accessing the data more efficiently
 import sys                      # For printing status
-import os                       # For executing terminal commands
 
 SOURCE = '../TROPO_SIF_data/'   # Where to find the data
 NUM_TO_INSERT = -1              # Number of records to insert. All = -1
@@ -27,8 +26,8 @@ conn = dbapi.connect(host= '127.0.0.1',
 cursor = conn.cursor()
 
 # Clear database first (temporary line)
-os.system("PGPASSWORD=frankenberg psql -U postgres -d SIF_Experiments -f \
-            ../SQL_Scripts/make_SIF_tables.sql ")
+# os.system("PGPASSWORD=frankenberg psql -U postgres -d SIF_Experiments -f \
+#            ../SQL_Scripts/make_SIF_tables.sql ")
 
 # Which number file we are working on
 file_num = 1
@@ -74,11 +73,12 @@ for file in sorted(os.listdir(SOURCE)):
 
             # Create SQL statement
             cmd = 'INSERT INTO tropomi_sif VALUES (DEFAULT, \' %s \', \
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);' % \
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, \
+                    \'POINT(%s %s)\' :: geometry);' % \
                    (date, sifs[i], 
                     sif_errs[i], sif_rels[i], dcSIFs[i], cloud_fractions[i],
                     szas[i], vzas[i], phase_angles[i], dcfs[i], 
-                    lats[i], lons[i])
+                    lats[i], lons[i], lons[i], lats[i])
 
             # Update user about insertion progress
             sys.stdout.write('\r')
@@ -93,8 +93,10 @@ for file in sorted(os.listdir(SOURCE)):
             # Execute the command
             cursor.execute(cmd)
     
-    # Increment file number that we are working on
-    file_num += 1
+        # Increment file number that we are working on
+        file_num += 1
 
+    if file_num > 5:
+        break
 # Commit all changes to the database
 conn.commit()
