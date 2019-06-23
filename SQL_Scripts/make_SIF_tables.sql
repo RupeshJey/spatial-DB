@@ -29,6 +29,7 @@ CREATE TABLE tropomi_SIF (
     dcf             NUMERIC(10, 7)       NOT NULL,
     lat             NUMERIC(10, 7)       NOT NULL,
     lon             NUMERIC(10, 7)       NOT NULL,
+    center_pt       GEOMETRY             NOT NULL,       
     
     -- The id is enough to uniquely identify the data point
     PRIMARY KEY (tropomi_id)
