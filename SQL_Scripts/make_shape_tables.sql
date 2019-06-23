@@ -15,7 +15,7 @@ CREATE TABLE shapes (
     shape_id        SERIAL, 
 
     -- Name of shape
-    name            VARCHAR(25)          NOT NULL,
+    name            VARCHAR(100)          NOT NULL,
 
     -- Type of shape (country / state / county)
     type            VARCHAR(10)          NOT NULL
