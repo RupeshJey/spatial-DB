@@ -13,9 +13,12 @@ import matplotlib.pyplot as plt   # For plotting the data
 
 from bokeh.io import show                           # For showing the plot
 from bokeh.models import LogColorMapper             # For mapping values/colors
+from bokeh.models import ColumnDataSource           # For holding data
 from bokeh.palettes import Viridis256 as palette    # The palette to use
-from bokeh.plotting import figure                   # For creating the map
+from bokeh.plotting import figure, curdoc           # For creating the map
 from bokeh.events import Tap                        # For recognizing tap
+from bokeh.layouts import column                    # For arranging view in cols
+from bokeh.models import ColorBar                   # For map's color bar
 
 
 import shapely          # For checking shape type (Polygon/Multipolygon)
@@ -128,12 +131,17 @@ TOOLS = "pan,wheel_zoom,reset,hover,save,tap"
 # Configure the figure
 p = figure(
     title="SIF Average by County: 02/01/2019 - 02/05/2019", tools=TOOLS,
+    active_scroll = "wheel_zoom",
     x_axis_location=None, y_axis_location=None,
     tooltips=[
         ("Name", "@name"), ("Average SIF", "@sifs"), ("(Long, Lat)", "($x, $y)")
     ],
-    plot_height = 800,
-    plot_width = 1600)
+    plot_height = 600,
+    plot_width = 1200,
+    output_backend="webgl")
+
+# No logo
+p.toolbar.logo = None
 
 # No grid
 p.grid.grid_line_color = None
@@ -147,7 +155,77 @@ color_mapper = LogColorMapper(palette=palette)
 # Patch all the information onto the map
 p.patches('x', 'y', source=data,
           fill_color={'field': 'sifs', 'transform': color_mapper},
-          fill_alpha=0.7, line_color="white", line_width=0.1)
+          fill_alpha=0.9, line_color="white", line_width=0.1)
+p.title.text_font_size = '16pt'
 
-# Show the map! 
-show(p)
+# create a callback that will add a number in a random location
+def county_clicked(event):
+
+    # Obtain click information
+    coord_x = event.x
+    coord_y = event.y
+
+    # Command that requests the SIF value time-series for the selected county
+    cmd =  "WITH county AS (SELECT name, shape FROM shapes \
+                            WHERE (shape && 'POINT(%s %s)' :: geometry)\
+                            AND ST_CONTAINS(shape, 'POINT(%s %s)' :: geometry)\
+                            AND type = 'County'\
+            LIMIT 1)\
+            SELECT (SELECT name from county), \
+                    date_trunc('day', time), \
+                    AVG(sif) FROM tropomi_sif \
+            WHERE ((SELECT shape FROM county) && center_pt) \
+                    AND ST_CONTAINS((SELECT shape FROM county), center_pt)\
+            GROUP BY date_trunc('day', time)\
+            ORDER BY date_trunc('day', time);" \
+            % (coord_x, coord_y, coord_x, coord_y)
+
+    # Execute query and obtain results
+    cursor.execute(cmd)
+
+    # Array to store the series of obtained results
+    dates = []
+    sifs = []
+
+    # Get the county's name
+    county_name = ''
+
+    # Loop through each record and get the info you need
+    for name, date, avg in cursor:
+        county_name = name
+        dates.append(date.date())
+        sifs.append(float(avg))
+
+    # Set the title of the Time Series plot to reflect the selected county
+    sif_series.title.text = "SIF Time-Series in County: %s" % (name)
+    source.data = dict(date=dates, t1=sifs)
+
+# Source of the time-series data should be empty for now
+source = ColumnDataSource(data=dict(date=[], t1=[]))
+
+# Figure that holds the time-series
+sif_series = figure(plot_width=800, plot_height=400, x_axis_type='datetime',
+                    title= "SIF Time-Series (Select county..)",
+                    x_axis_label = 'Date',
+                    y_axis_label = 'SIF Average')
+
+# Scatter/line plot to reflect data in source
+sif_series.line('date', 't1', source=source, 
+                line_dash='dashed', color = "green")
+sif_series.circle('date', 't1', size=10, source=source, color="green")
+
+# Some font choices
+sif_series.title.text_font_size = '16pt'
+sif_series.xaxis.axis_label_text_font_size = "12pt"
+sif_series.yaxis.axis_label_text_font_size = "12pt"
+
+# No logo
+sif_series.toolbar.logo = None
+
+# When a patch is selected, trigger the county_clicked function
+p.on_event(Tap, county_clicked)
+
+# Put the patches and sif_series together in a column and set this 
+# as the document's root
+curdoc().add_root(column(p, sif_series))
+
