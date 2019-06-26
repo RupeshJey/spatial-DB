@@ -24,11 +24,9 @@ CREATE TABLE tropomi_SIF (
     vza             NUMERIC(10, 7)       NOT NULL,
     phase_angle     NUMERIC(10, 7)       NOT NULL,
     dcf             NUMERIC(10, 7)       NOT NULL,     
-    -- lat             NUMERIC(10, 7)       NOT NULL,
-    -- lon             NUMERIC(10, 7)       NOT NULL,
+
+    -- Geometric properties of the data record
     center_pt       GEOMETRY             NOT NULL,  -- Data's center point
     mbr             GEOMETRY             NOT NULL   -- Data's bounding rectangle
-    -- TODO: Bounding box polygon
-    
 );
 
