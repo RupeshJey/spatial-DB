@@ -7,34 +7,41 @@
 import os                       # For searching through files + executing cmd's
 import netCDF4 as nc            # For parsing data format
 import psycopg2 as dbapi        # For connecting to database
+import psycopg2.extras          # For using the execute_values function 
 from datetime import datetime   # For converting unix time to SQL datetime
 import time                     # For timing the insertion
 import numpy as np              # For accessing the data more efficiently
 import sys                      # For printing status
 
-SOURCE = '../TROPO_SIF_data/'   # Where to find the data
+# For getting the connection details (stored abstractly)
+from connection_info import conn
+
+SOURCE = conn['data_source']    # Where to find the data
 NUM_TO_INSERT = -1              # Number of records to insert. All = -1
 
 # Connect to database
-conn = dbapi.connect(host= '127.0.0.1', 
-                     port= 5432, 
-                     user= 'postgres',
-                     password= 'frankenberg', 
-                     database= 'SIF_Experiments')
+connection = dbapi.connect(port= conn['port'], 
+                     user= conn['user'],
+                     password= conn['password'], 
+                     database= conn['database'])
 
 # Cursor to execute queries and read output
-cursor = conn.cursor()
+cursor = connection.cursor()
 
 # Clear database first (temporary line)
-# os.system("PGPASSWORD=frankenberg psql -U postgres -d SIF_Experiments -f \
-#            ../SQL_Scripts/make_SIF_tables.sql ")
+os.system("PGPASSWORD=%s psql -U %s -d %s -f \
+           ../SQL_Scripts/make_SIF_tables.sql " % 
+           (conn['password'], conn['user'], conn['database']))
 
 # Which number file we are working on
 file_num = 1
 
 # Loop over each data file in the directory 
-for file in sorted(os.listdir(SOURCE)):
+for file in reversed(sorted(os.listdir(SOURCE))):
     if file.endswith('.nc'):
+
+        # Starting time for inserting file
+        t0 = time.time()
 
         # Parse it
         nc_file = nc.Dataset(SOURCE + file, 'r')
@@ -53,6 +60,8 @@ for file in sorted(os.listdir(SOURCE)):
         dcfs = np.array(nc_file.variables['daily_correction_factor'])
         lats = np.array(nc_file.variables['lat'])
         lons = np.array(nc_file.variables['lon'])
+        lat_bnds = np.array(nc_file.variables['lat_bnds'])
+        lon_bnds = np.array(nc_file.variables['lon_bnds'])
 
         # Total number of rows
         num_rows = len(datetimes)
@@ -60,9 +69,12 @@ for file in sorted(os.listdir(SOURCE)):
         # Percentage completed variable
         progress = 0
 
-        # Notify user which file we are working on 
-        print("Inserting file %i/%i (%s)" % 
+        # Notify user which file we are reading now
+        print("Reading file %i/%i (%s)" % 
             (file_num, len(os.listdir(SOURCE)), file))
+
+        # Take all the arguments and put them together in here
+        args = []
 
         # Insert rows one-by-one
         for i in range(num_rows):
@@ -71,16 +83,23 @@ for file in sorted(os.listdir(SOURCE)):
             date = datetime.utcfromtimestamp(datetimes[i]).strftime\
                 ('%Y-%m-%d %H:%M:%S')
 
-            # Create SQL statement
-            cmd = 'INSERT INTO tropomi_sif VALUES (DEFAULT, \' %s \', \
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, \
-                    \'POINT(%s %s)\' :: geometry);' % \
-                   (date, sifs[i], 
-                    sif_errs[i], sif_rels[i], dcSIFs[i], cloud_fractions[i],
-                    szas[i], vzas[i], phase_angles[i], dcfs[i], 
-                    lats[i], lons[i], lons[i], lats[i])
+            # This quickly interweaves the bounds to match the Postgis 
+            # Polygon definition
+            bnds = np.empty(10)
+            bnds[0:9:2] = lon_bnds[:,i].take(np.arange(0, 5), mode = 'wrap')
+            bnds[1:10:2] = lat_bnds[:,i].take(np.arange(0, 5), mode = 'wrap')
 
-            # Update user about insertion progress
+            # Compile the args
+            args.append((date, float(sifs[i]), float(sif_errs[i]), 
+                         float(sif_rels[i]), float(dcSIFs[i]), 
+                         float(cloud_fractions[i]), float(szas[i]), 
+                         float(vzas[i]), float(phase_angles[i]), 
+                         float(dcfs[i]), 
+                         'Point(%f %f)' % (float(lons[i]), float(lats[i])),
+                         'Polygon((%f %f, %f %f, %f %f, %f %f, %f %f))' % 
+                            tuple(bnds.tolist())))
+
+            # Update user about file-reading progress
             sys.stdout.write('\r')
             curr_progress = int(float(i) / float(num_rows)  * 100)
 
@@ -89,14 +108,25 @@ for file in sorted(os.listdir(SOURCE)):
                 sys.stdout.write("[%-50s] %d%%" % 
                     ('='*int(progress/2), progress))
                 sys.stdout.flush()
-
-            # Execute the command
-            cursor.execute(cmd)
     
         # Increment file number that we are working on
         file_num += 1
+        
+        # Notify the user that we are inserting the data now
+        sys.stdout.write(' ' * 60)
+        sys.stdout.write('\r')
+        print("Inserting...")
+
+        # Execute the command using the execute_values command
+        # This runs a lot faster than running one execution at a time
+        dbapi.extras.execute_values(cursor, "INSERT INTO tropomi_sif VALUES %s", 
+            args)
+
+        # Notify the user of how long it took to insert the data
+        print("Inserting the file took %i seconds" % (time.time() - t0))
 
     if file_num > 5:
         break
+
 # Commit all changes to the database
-conn.commit()
+connection.commit()
