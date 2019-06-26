@@ -9,24 +9,27 @@ import geopandas as gpd           # For extracting data in a geo framework
 import time                       # For timing the insertion
 import matplotlib.pyplot as plt   # For plotting the data
 
+# For getting the connection details (stored abstractly)
+from connection_info import conn
+
 # Where to find the data
 SOURCE = '../Shape_Outlines/'   
 COUNTY_FILE = 'Counties_LCC.shp'
 
 # Connect to database
-conn = dbapi.connect(host= '127.0.0.1', 
-                     port= 5432, 
-                     user= 'postgres',
-                     password= 'frankenberg', 
-                     database= 'SIF_Experiments')
+connection = dbapi.connect(port= conn['port'], 
+                     user= conn['user'],
+                     password= conn['password'], 
+                     database= conn['database'])
 
 # Cursor to execute queries and read output
-cursor = conn.cursor()
+cursor = connection.cursor()
 
 # Command that requests the average SIF value for each county
 cmd = "SELECT name, AVG(sif) AS sif, shape \
        FROM tropomi_sif CROSS JOIN shapes \
        WHERE type = 'County' AND\
+       ST_X(center_pt) > -140 AND\
        (shape && center_pt) AND ST_CONTAINS(shape, center_pt) \
        GROUP BY name, shape;"
 
@@ -34,7 +37,7 @@ cmd = "SELECT name, AVG(sif) AS sif, shape \
 t0 = time.time()
 
 # Execute query and obtain results
-counties = gpd.GeoDataFrame.from_postgis(cmd, conn, geom_col = 'shape')
+counties = gpd.GeoDataFrame.from_postgis(cmd, connection, geom_col = 'shape')
 
 # Notify user of how long it took to execute
 print("Took " + str(time.time() - t0) + " seconds to run")

@@ -16,6 +16,9 @@ import sys                      # For printing status
 import csv                      # For parsing county files
 import re                       # For string-parsing the JSON in csv 
 
+# For getting the connection details (stored abstractly)
+from connection_info import conn
+
 SOURCE = '../Shape_Outlines/'   # Where to find the data
 
 # Specific files to use
@@ -28,14 +31,13 @@ NUM_STATES = 52         # This includes Puerto Rico and D.C. separately
 NUM_COUNTIES = 3141
 
 # Connect to database
-conn = dbapi.connect(host= '127.0.0.1', 
-                     port= 5432, 
-                     user= 'postgres',
-                     password= 'frankenberg', 
-                     database= 'SIF_Experiments')
+connection = dbapi.connect(port= conn['port'], 
+                     user= conn['user'],
+                     password= conn['password'], 
+                     database= conn['database'])
 
 # Cursor to execute queries and read output
-cursor = conn.cursor()
+cursor = connection.cursor()
 
 # Set up the database itself
 os.system("PGPASSWORD=frankenberg psql -U postgres -d SIF_Experiments -f \
@@ -160,7 +162,7 @@ sys.stdout.write("\r")
 # If something breaks in between, it would otherwise leave the shapes
 # without any counties. 
 
-conn.commit()
+connection.commit()
 
 # Notify user of completion
 print("Done inserting counties!")

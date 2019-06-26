@@ -10,7 +10,6 @@ import geopandas as gpd           # For extracting data in a geo framework
 import time                       # For timing the insertion
 import matplotlib.pyplot as plt   # For plotting the data
 
-
 from bokeh.io import show                           # For showing the plot
 from bokeh.models import LogColorMapper             # For mapping values/colors
 from bokeh.models import ColumnDataSource           # For holding data
@@ -20,24 +19,24 @@ from bokeh.events import Tap                        # For recognizing tap
 from bokeh.layouts import column                    # For arranging view in cols
 from bokeh.models import ColorBar                   # For map's color bar
 
-
 import shapely          # For checking shape type (Polygon/Multipolygon)
 import numpy as np      # Converting lists to np lists (bugs out otherwise)
 
+# For getting the connection details (stored abstractly)
+from connection_info import conn
 
 # # Where to find the data
 SOURCE = '../Shape_Outlines/'   
 COUNTY_FILE = 'Counties_LCC.shp'
 
 # Connect to database
-conn = dbapi.connect(host= '127.0.0.1', 
-                     port= 5432, 
-                     user= 'postgres',
-                     password= 'frankenberg', 
-                     database= 'SIF_Experiments')
+connection = dbapi.connect(port= conn['port'], 
+                     user= conn['user'],
+                     password= conn['password'], 
+                     database= conn['database'])
 
 # Cursor to execute queries and read output
-cursor = conn.cursor()
+cursor = connection.cursor()
 
 # Command that requests the average SIF value for each county
 cmd = "SELECT name, AVG(sif) AS sif, shape \
@@ -51,7 +50,8 @@ cmd = "SELECT name, AVG(sif) AS sif, shape \
 t0 = time.time()
 
 # Execute query and obtain results
-county_aggregates = gpd.GeoDataFrame.from_postgis(cmd, conn, geom_col = 'shape')
+county_aggregates = gpd.GeoDataFrame.from_postgis(cmd, connection, 
+                                                    geom_col = 'shape')
 
 # Notify user of how long it took to execute
 print("Took " + str(time.time() - t0) + " seconds to run")
