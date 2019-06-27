@@ -29,9 +29,9 @@ connection = dbapi.connect(port= conn['port'],
 cursor = connection.cursor()
 
 # Clear database first (temporary line)
-os.system("PGPASSWORD=%s psql -U %s -d %s -f \
+os.system("PGPASSWORD=%s psql -U %s -p %s -d %s -f \
            ../SQL_Scripts/make_SIF_tables.sql " % 
-           (conn['password'], conn['user'], conn['database']))
+           (conn['password'], conn['user'], conn['port'], conn['database']))
 
 # Which number file we are working on
 file_num = 1
@@ -119,14 +119,18 @@ for file in reversed(sorted(os.listdir(SOURCE))):
 
         # Execute the command using the execute_values command
         # This runs a lot faster than running one execution at a time
-        dbapi.extras.execute_values(cursor, "INSERT INTO tropomi_sif VALUES %s", 
+        dbapi.extras.execute_values(cursor, "INSERT INTO tropomi_sif \
+            (time, sif, sif_err, sif_relative, dcsif, cloud_fraction, \
+            sza, vza, phase_angle, dcf, center_pt, mbr) VALUES %s", 
             args)
 
         # Notify the user of how long it took to insert the data
         print("Inserting the file took %i seconds" % (time.time() - t0))
 
-    if file_num > 5:
-        break
+    if file_num > 15:
+        # Commit all changes to the database
+        connection.commit()
 
 # Commit all changes to the database
 connection.commit()
+

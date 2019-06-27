@@ -40,8 +40,9 @@ connection = dbapi.connect(port= conn['port'],
 cursor = connection.cursor()
 
 # Set up the database itself
-os.system("PGPASSWORD=frankenberg psql -U postgres -d SIF_Experiments -f \
-           ../SQL_Scripts/make_shape_tables.sql ")
+os.system("PGPASSWORD=%s psql -U %s -p %s -d %s -f \
+           ../SQL_Scripts/make_shape_tables.sql" % 
+           (conn['password'], conn['user'], conn['port'], conn['database']))
 
 ########################################################################
 # INSERT STATES
