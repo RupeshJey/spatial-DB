@@ -33,8 +33,68 @@ CREATE TABLE tropomi_SIF (
     mbr             GEOMETRY            NOT NULL,  -- Data's bounding rectangle
 
     -- Uniquely identifies a data record
-    PRIMARY KEY (record_id)
-);
+    PRIMARY KEY (record_id, time)
+) PARTITION BY RANGE(time); -- Want to partition this table by time
+
+-- CREATE PARTITIONS of tropomi_SIF
+
+-- 2017
+CREATE TABLE tropomi_SIF_y2017_m11 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2017-11-01') TO ('2017-12-01');
+CREATE TABLE tropomi_SIF_y2017_m12 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2017-12-01') TO ('2018-01-01');
+
+-- 2018
+CREATE TABLE tropomi_SIF_y2018_m01 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2018-01-01') TO ('2018-02-01');
+CREATE TABLE tropomi_SIF_y2018_m02 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2018-02-01') TO ('2018-03-01');
+CREATE TABLE tropomi_SIF_y2018_m03 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2018-03-01') TO ('2018-04-01');
+CREATE TABLE tropomi_SIF_y2018_m04 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2018-04-01') TO ('2018-05-01');
+CREATE TABLE tropomi_SIF_y2018_m05 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2018-05-01') TO ('2018-06-01');
+CREATE TABLE tropomi_SIF_y2018_m06 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2018-06-01') TO ('2018-07-01');
+CREATE TABLE tropomi_SIF_y2018_m07 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2018-07-01') TO ('2018-08-01');
+CREATE TABLE tropomi_SIF_y2018_m08 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2018-08-01') TO ('2018-09-01');
+CREATE TABLE tropomi_SIF_y2018_m09 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2018-09-01') TO ('2018-10-01');
+CREATE TABLE tropomi_SIF_y2018_m10 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2018-10-01') TO ('2018-11-01');
+CREATE TABLE tropomi_SIF_y2018_m11 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2018-11-01') TO ('2018-12-01');
+CREATE TABLE tropomi_SIF_y2018_m12 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2018-12-01') TO ('2019-01-01');
+
+-- 2019
+CREATE TABLE tropomi_SIF_y2019_m01 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2019-01-01') TO ('2019-02-01');
+CREATE TABLE tropomi_SIF_y2019_m02 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2019-02-01') TO ('2019-03-01');
+CREATE TABLE tropomi_SIF_y2019_m03 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2019-03-01') TO ('2019-04-01');
+CREATE TABLE tropomi_SIF_y2019_m04 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2019-04-01') TO ('2019-05-01');
+CREATE TABLE tropomi_SIF_y2019_m05 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2019-05-01') TO ('2019-06-01');
+CREATE TABLE tropomi_SIF_y2019_m06 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2019-06-01') TO ('2019-07-01');
+CREATE TABLE tropomi_SIF_y2019_m07 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2019-07-01') TO ('2019-08-01');
+CREATE TABLE tropomi_SIF_y2019_m08 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2019-08-01') TO ('2019-09-01');
+CREATE TABLE tropomi_SIF_y2019_m09 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2019-09-01') TO ('2019-10-01');
+CREATE TABLE tropomi_SIF_y2019_m10 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2019-10-01') TO ('2019-11-01');
+CREATE TABLE tropomi_SIF_y2019_m11 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2019-11-01') TO ('2019-12-01');
+CREATE TABLE tropomi_SIF_y2019_m12 PARTITION OF tropomi_SIF
+    FOR VALUES FROM ('2019-12-01') TO ('2020-01-01');
 
 -- CREATE INDEX statements 
 
@@ -45,11 +105,10 @@ CREATE TABLE tropomi_SIF (
 -- Tradeoffs! 
 
 -- Index on the center points of the data
-CREATE INDEX center_points_index
-  ON tropomi_sif
+CREATE INDEX center_points_idx
+  ON tropomi_SIF
   USING GIST (center_pt);
 
 -- Index on the timestamp of the data
 CREATE INDEX time_idx
-  ON tropomi_sif (time);
-
+  ON tropomi_SIF (time);
