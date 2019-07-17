@@ -7,7 +7,7 @@
 import psycopg2 as dbapi          # For connecting to database
 import json                       # For parsing shapes
 import geopandas as gpd           # For extracting data in a geo framework
-import time                       # For timing the insertion
+import time                       # For timing 
 import matplotlib.pyplot as plt   # For plotting the data
 
 from bokeh.io import show                           # For showing the plot
@@ -39,11 +39,10 @@ connection = dbapi.connect(port= conn['port'],
 cursor = connection.cursor()
 
 # Command that requests the average SIF value for each county
-cmd = "SELECT name, AVG(sif) AS sif, shape \
-       FROM tropomi_sif CROSS JOIN shapes \
+cmd = "SELECT name, AVG(sif_avg) AS sif, shape \
+       FROM county_day_sif_facts NATURAL JOIN shapes \
        WHERE type = 'County' AND\
-       ST_X(center_pt) > -140 AND\
-       (shape && center_pt) AND ST_CONTAINS(shape, center_pt) \
+       day = '2019-02-26'\
        GROUP BY name, shape;"
 
 # Start time
@@ -122,7 +121,7 @@ data=dict(
     x= np.array(county_xs),
     y= np.array(county_ys),
     name= np.array(county_names),
-    sifs= np.array(county_averages),
+    sifs= county_averages.tolist(),
 )
 
 # Which tools should be available to the user

@@ -12,10 +12,6 @@ import matplotlib.pyplot as plt   # For plotting the data
 # For getting the connection details (stored abstractly)
 from connection_info import conn
 
-# Where to find the data
-SOURCE = '../Shape_Outlines/'   
-COUNTY_FILE = 'Counties_LCC.shp'
-
 # Connect to database
 connection = dbapi.connect(port= conn['port'], 
                      user= conn['user'],
@@ -30,7 +26,9 @@ cmd = "SELECT name, AVG(sif) AS sif, shape \
        FROM tropomi_sif CROSS JOIN shapes \
        WHERE type = 'County' AND\
        ST_X(center_pt) > -140 AND\
-       (shape && center_pt) AND ST_CONTAINS(shape, center_pt) \
+       (shape && center_pt) AND ST_CONTAINS(shape, center_pt) AND\
+       time BETWEEN 'April 1 2018'::timestamp AND \
+       		'March 20 2019'::timestamp + INTERVAL '1 week'\
        GROUP BY name, shape;"
 
 # Start time
@@ -46,7 +44,7 @@ print("Took " + str(time.time() - t0) + " seconds to run")
 counties.plot(column = 'sif', legend = True)
 
 # Give the plots appropriate title/labels
-plt.title('SIF Average by County: 02/01/2019 - 02/05/2019')
+plt.title('SIF Average by County')
 plt.ylabel('latitude')
 plt.xlabel('longitude')
 
