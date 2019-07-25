@@ -4,6 +4,7 @@
 # This file holds commonly used db tools / queries
 import psycopg2 as dbapi               # For connecting to database
 from datetime import datetime as dt    # For converting utc / date
+import datetime                        # Comparing type
 
 import shapely          # For checking shape type (Polygon/Multipolygon)
 import numpy as np      # Converting lists to np lists (bugs out otherwise)
@@ -28,10 +29,8 @@ cursor = conn.cursor()
 def query_db(cmd):
     """
     Execute query on db, and return output
-
     Parameters: 
     cmd (string): the command to be executed
-
     Returns: 
     list of rows
     """
@@ -53,11 +52,9 @@ def query_db(cmd):
 def spatial_query_db(cmd, geom_col = 'shape'):
     """
     Execute a spatial query using geopandas and return output
-
     Parameters: 
     cmd (string): the command to be executed
     geom_col (string): the geometry column; default = 'shape'
-
     Returns:
     GeoDataFrame of results
     """
@@ -65,26 +62,26 @@ def spatial_query_db(cmd, geom_col = 'shape'):
 
 def utc_from_timestamp(date):
     """Return utc format from timestamp.""" 
+    # If this is a date already, go ahead and return it
+    if type(date) == datetime.date:
+        return date
+    # Otherwise, convert it first
     return dt.utcfromtimestamp(date/1000).strftime('%Y-%m-%d')
 
 def multify(shapes, rows, return_polygons = False):
     """ 
     Convert geometry-wise items to polygon-wise items
-
     Take a series of rows corresponding to shapes 
     (polygons or multi-polygons) and map it to a series
     of strictly polygons, by appending all non-first 
     polygon values to the end. 
-
     Parameters: 
     shapes: list of shapes to examine (shapely format)
     rows: the actual data to reformat
     return_polygons: whether you want the actual point-wise lists of 
                      polygons back
-
     Returns: 
     list of rows with appended content
-
     """ 
 
     # If needed, create empty containers for the new shapes
@@ -138,9 +135,12 @@ def multify(shapes, rows, return_polygons = False):
         shape_num += 1
     
     if (return_polygons):
-        xs = np.append(xs, xs_appended)
-        ys = np.append(ys, ys_appended)
-        return (xs, ys, rows)
+
+        if (len(xs_appended) > 0):
+            xs = np.append(xs, xs_appended)
+            ys = np.append(ys, ys_appended)
+
+        return (xs, ys, rows) # list [array([])] vs. list [list([])]
 
     return rows
 
@@ -172,4 +172,3 @@ def convert_shapes_to_mercator(lats, lons):
         new_lons.append(new_c_lon)
 
     return (np.array(new_lats), np.array(new_lons))
-

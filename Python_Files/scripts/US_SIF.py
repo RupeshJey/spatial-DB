@@ -23,6 +23,7 @@ from bokeh.models.widgets import RadioButtonGroup   # Selecting layer
 from bokeh.tile_providers import get_provider, Vendors
 
 # Custom layers
+from world_grid_2_degree_layer import US_World_Grid_2_Degree_Layer
 from us_county_layer import US_County_Layer
 from us_state_layer import US_State_Layer
 
@@ -30,10 +31,11 @@ import shapely          # For checking shape type (Polygon/Multipolygon)
 import numpy as np      # Converting lists to np lists (bugs out otherwise)
 
 # The date range the map should start on
-START_DATE_INIT = date(2019, 1, 5)
-END_DATE_INIT = date(2019, 1, 15)
+START_DATE_INIT = date(2018, 9, 1)
+END_DATE_INIT = date(2018, 9, 11)
 
 # Initialize all layers
+world_grid_2_degree_layer = US_World_Grid_2_Degree_Layer()
 us_state_layer = US_State_Layer()
 us_county_layer = US_County_Layer()
 
@@ -59,13 +61,24 @@ def US_SIF_tab():
         # Get initial map details
         xs, ys, names = active_layer.get_map_details()
 
+        # print(xs)
+
+        # Unpack the current range
+        range_start, range_end = date_range_slider.value
+
+        # Convert to SQL format
+        range_start = utc_from_timestamp(range_start)
+        range_end = utc_from_timestamp(range_end)
+
         # Get the initial sif values
-        sifs = active_layer.get_data_for_date_range(START_DATE_INIT, 
-                                                    END_DATE_INIT)
+        sifs = active_layer.get_data_for_date_range(range_start, 
+                                                    range_end)
+
+        # print(np.array(xs).tolist())
 
         # Dictionary to hold the data
         new_source_dict = dict(
-            x= np.array(xs), y= np.array(ys),
+            x= xs, y= ys,
             name= np.array(names), sifs= np.array(sifs))
         
         # Update all source data values
@@ -82,7 +95,7 @@ def US_SIF_tab():
             0 : None,
             1 : us_state_layer,
             2 : us_county_layer,
-            3 : None,
+            3 : world_grid_2_degree_layer,
         }
 
         # Swap out the active layer
@@ -160,7 +173,7 @@ def US_SIF_tab():
     )
 
     # Which tools should be available to the user
-    TOOLS = "pan,wheel_zoom,reset,hover,save,tap"
+    TOOLS = "pan,wheel_zoom,reset,hover,save,poly_draw,tap"
 
     # Obtain map provider
     tile_provider = get_provider(Vendors.CARTODBPOSITRON_RETINA)
@@ -266,4 +279,3 @@ def US_SIF_tab():
 
     # Return the created tab
     return tab
-        
