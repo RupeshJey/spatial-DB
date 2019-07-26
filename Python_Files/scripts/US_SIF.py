@@ -12,10 +12,11 @@ from bokeh.models import ColumnDataSource           # For holding data
 from bokeh.palettes import Viridis256 as palette    # The map palette to use
 from bokeh.palettes import Category10 as time_pltt  # Time srs palette to use
 from bokeh.plotting import figure                   # For creating the map
-from bokeh.events import Tap                        # For recognizing tap
+from bokeh.events import Tap, SelectionGeometry     # For recognizing tap
 from bokeh.layouts import row, column               # For arranging view in grid
 from bokeh.models import ColorBar, FixedTicker      # For map's color bar
 from bokeh.models import DateRangeSlider            # For date selection
+from bokeh.models import LassoSelectTool
 from bokeh.models import Panel                      # For assigning grid to view
 from bokeh.models.widgets import RadioButtonGroup   # Selecting layer
 
@@ -173,7 +174,7 @@ def US_SIF_tab():
     )
 
     # Which tools should be available to the user
-    TOOLS = "pan,wheel_zoom,reset,hover,save,poly_draw,tap"
+    TOOLS = "pan,wheel_zoom,reset,hover,save,tap"
 
     # Obtain map provider
     tile_provider = get_provider(Vendors.CARTODBPOSITRON_RETINA)
@@ -228,6 +229,66 @@ def US_SIF_tab():
     # Set up time series
     #################################
 
+    def shape_selected(event):
+
+        # Obtain selected geometry
+        xs = np.array(list(event.geometry['x'].values()))
+        ys = np.array(list(event.geometry['y'].values()))
+
+        custom_data = dict(
+            x= xs,
+            y= ys)
+
+        # p.line('x', 'y', source=custom_data,
+        #       line_color="gray", line_width=0.5, 
+        #       legend = "Map")
+
+        p.patch('x', 'y', source=custom_data,
+              line_color="darkslategray", line_width=1, 
+              fill_alpha=0.3, fill_color="lightgray",
+              legend = "Selected Region")
+
+        # source.data = custom_data
+
+        print("adding geometry")
+
+        polygon_str = "POLYGON(("
+
+        coords = list(zip(xs, ys))
+
+        for x, y in coords:
+            coord_x, coord_y = to_lat_lon(y, x)
+            polygon_str += (str(coord_x) + " " + str(coord_y) + ",")
+
+        x_first, y_first = coords[0]
+        coord_x, coord_y = to_lat_lon(y_first, x_first)
+        polygon_str += (str(coord_x) + " " + str(coord_y) + ",")
+
+        polygon_str = polygon_str[:-1] + "))"
+
+        cmd = " WITH area AS (SELECT ST_GeomFromText(\'%s\') AS shape)\
+                SELECT date_trunc('day', time), \
+                        AVG(sif) FROM tropomi_sif \
+                WHERE ((SELECT shape FROM area) && center_pt) \
+                        AND ST_CONTAINS((SELECT shape FROM area), center_pt)\
+                GROUP BY date_trunc('day', time)\
+                ORDER BY date_trunc('day', time);" % polygon_str
+
+        # Obtain results
+        result = query_db(cmd)
+
+        # Check that there are sufficient values
+        if len(result) <= 1:
+            return 
+
+        # Map the rows to columns and take series
+        mapped_result = [list(i) for i in zip(*result)]
+        dates, sifs = (mapped_result[0], mapped_result[1])
+
+        # Set the appropriate data source
+        time_srs_src.data = dict(date=dates, sif=sifs)
+        
+
     def patch_clicked(event):
 
         # Obtain new information
@@ -266,6 +327,11 @@ def US_SIF_tab():
 
     # When a patch is selected, trigger the patch_time_series function
     p.on_event(Tap, patch_clicked)
+    
+    # On geometry selection
+    lasso = LassoSelectTool(select_every_mousemove = False)
+    p.add_tools(lasso)
+    p.on_event(SelectionGeometry, shape_selected)
 
     #################################
     # Set up tab
