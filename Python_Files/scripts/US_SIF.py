@@ -22,6 +22,7 @@ from bokeh.models.widgets import RadioButtonGroup   # Selecting layer
 
 # For mapping
 from bokeh.tile_providers import get_provider, Vendors
+from bokeh.models import WMTSTileSource
 
 # Custom layers
 from world_grid_2_degree_layer import US_World_Grid_2_Degree_Layer
@@ -31,14 +32,31 @@ from us_state_layer import US_State_Layer
 import shapely          # For checking shape type (Polygon/Multipolygon)
 import numpy as np      # Converting lists to np lists (bugs out otherwise)
 
+import pickle           # For saving layers
+import os.path          # For checking if path exists
+from os import path
+
 # The date range the map should start on
 START_DATE_INIT = date(2018, 9, 1)
 END_DATE_INIT = date(2018, 9, 11)
 
 # Initialize all layers
-world_grid_2_degree_layer = US_World_Grid_2_Degree_Layer()
-us_state_layer = US_State_Layer()
-us_county_layer = US_County_Layer()
+
+LAYERS_FILE = 'layers.dump'
+
+# From a save file
+if path.exists(LAYERS_FILE):
+    with open(LAYERS_FILE, 'rb') as layers_file:
+        us_county_layer, us_state_layer, world_grid_2_degree_layer \
+                                        = pickle.load(layers_file)
+# From scratch
+else:
+    us_county_layer = US_County_Layer()
+    us_state_layer = US_State_Layer()
+    world_grid_2_degree_layer = US_World_Grid_2_Degree_Layer()
+    with open(LAYERS_FILE, 'wb') as layers_file:
+        layers = (us_county_layer, us_state_layer, world_grid_2_degree_layer)
+        pickle.dump(layers, layers_file)
 
 # Set the active layer to be the county layer
 active_layer = us_county_layer
@@ -102,12 +120,14 @@ def US_SIF_tab():
         # Swap out the active layer
         active_layer = switcher.get(new, active_layer) 
 
+        # TODO: If this is the custom layer, add the selection tool
+            
         # Fetch new dates, shapes, names, etc. and refresh the page
         refresh_page()
 
     # Define selection labels
     layer_selector = RadioButtonGroup(
-        labels=["None", "US States", "US Counties", "World"], active=2)
+        labels=["Custom", "US States", "US Counties", "World"], active=2)
 
     # Set up layer selection callback
     layer_selector.on_click(layer_selected)
@@ -179,6 +199,16 @@ def US_SIF_tab():
     # Obtain map provider
     tile_provider = get_provider(Vendors.CARTODBPOSITRON_RETINA)
 
+    # tile_options = {}
+    # tile_options['url'] = 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}'
+    # tile_options['attribution'] = """
+    #     Map tiles by <a href="http://stamen.com">Stamen Design</a>, under
+    #     <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>.
+    #     Data by <a href="http://openstreetmap.org">OpenStreetMap</a>,
+    #     under <a href="http://www.openstreetmap.org/copyright">ODbL</a>.
+    #     """
+    # mq_tile_source = WMTSTileSource(**tile_options)
+
     # Don't want the map to wrap around
     tile_provider.wrap_around = False
 
@@ -235,20 +265,12 @@ def US_SIF_tab():
         xs = np.array(list(event.geometry['x'].values()))
         ys = np.array(list(event.geometry['y'].values()))
 
-        custom_data = dict(
-            x= xs,
-            y= ys)
-
-        # p.line('x', 'y', source=custom_data,
-        #       line_color="gray", line_width=0.5, 
-        #       legend = "Map")
+        custom_data = dict(x= xs, y= ys)
 
         p.patch('x', 'y', source=custom_data,
               line_color="darkslategray", line_width=1, 
               fill_alpha=0.3, fill_color="lightgray",
               legend = "Selected Region")
-
-        # source.data = custom_data
 
         print("adding geometry")
 
