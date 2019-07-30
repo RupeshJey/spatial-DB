@@ -7,14 +7,15 @@ from datetime import datetime as dt    # For converting utc / date
 import datetime                        # Comparing type
 
 import shapely          # For checking shape type (Polygon/Multipolygon)
+import itertools        # For looping through multipolygons
 import numpy as np      # Converting lists to np lists (bugs out otherwise)
 import math             # For converting mercator / coordinates
 import geopandas as gpd                # For extracting data in a geo framework
 from pyproj import Proj, transform     # For converting coordinates
 
-
 # For getting the connection details (stored abstractly)
 from connection_info import conn as conn_info
+
 
 
 # Connect to database
@@ -68,31 +69,26 @@ def utc_from_timestamp(date):
     # Otherwise, convert it first
     return dt.utcfromtimestamp(date/1000).strftime('%Y-%m-%d')
 
-def multify(shapes, rows, return_polygons = False):
+def multify(shapes):
     """ 
-    Convert geometry-wise items to polygon-wise items
-    Take a series of rows corresponding to shapes 
-    (polygons or multi-polygons) and map it to a series
-    of strictly polygons, by appending all non-first 
-    polygon values to the end. 
+    Convert geometry-wise items to x and y series items. 
+
+    Take a series of shapes (polygons or multi-polygons) 
+    and map it to a series of x-values and y-values, 
+    that can be read by bokeh. 
+
     Parameters: 
-    shapes: list of shapes to examine (shapely format)
-    rows: the actual data to reformat
-    return_polygons: whether you want the actual point-wise lists of 
-                     polygons back
+    shapes: list of shapes to reformat (from shapely format)
+
     Returns: 
     list of rows with appended content
     """ 
 
-    # If needed, create empty containers for the new shapes
-    if (return_polygons):
-        xs = []
-        ys = []
-        xs_appended = []
-        ys_appended = []
-
-    # Keep track of every row in the shapes list
-    shape_num = 0
+    # Create empty containers for the new shapes
+    xs = []
+    ys = []
+    xs_appended = []
+    ys_appended = []
 
     # For each shape
     for s in shapes:
@@ -100,49 +96,45 @@ def multify(shapes, rows, return_polygons = False):
         # If this is a simple polygon
         if (type(s) == shapely.geometry.polygon.Polygon):
 
-            # If needed, 
-            if (return_polygons):
-                # Extract polygon as a series of points
-                xs_curr, ys_curr = s.exterior.coords.xy
-                xs.append(np.array(xs_curr))
-                ys.append(np.array(ys_curr))
+            # Extract polygon as a series of points
+            xs_curr, ys_curr = s.exterior.coords.xy
+
+            xs.append(np.array(xs_curr))
+            ys.append(np.array(ys_curr))
 
         # If this is a multipolygon
         else:
+
             # Obtain list of constituent polygons
             ps = list(s)
 
-            # If needed, 
-            # Extract the first polygon's series and insert into 
-            # the points lists. Do this to avoid messing up the
-            # mapping b/w names, sifs, and shapes
+            # Join xs and ys together, separated by NaN's
+            # (Bokeh way to separate contituent polygons of multipolygons)
 
-            if (return_polygons):
-                xs_curr, ys_curr = ps[0].exterior.coords.xy
-                xs.append(np.array(xs_curr))
-                ys.append(np.array(ys_curr))
+            # Container for multipolgyon
+            xs_curr = np.array([])
+            ys_curr = np.array([]) 
 
-            # Add copy of row for each polygon
-            for i in range(len(ps) - 1):
-                rows = np.append(rows, rows[shape_num])
+            # Loop over each polgyon
+            for i in range(len(ps)):
 
-                if (return_polygons):
-                    xs_curr, ys_curr = ps[i+1].exterior.coords.xy
-                    xs_appended.append(np.array(xs_curr))
-                    ys_appended.append(np.array(ys_curr))
+                # Extract x and y series
+                single_xs, single_ys = ps[i].exterior.coords.xy
+                single_xs = np.array(single_xs)
+                single_ys = np.array(single_ys)
 
-        # Increment county number
-        shape_num += 1
-    
-    if (return_polygons):
+                # Append them to the list of xs and ys for this shape
+                xs_curr = np.append(xs_curr, single_xs)
+                ys_curr = np.append(ys_curr, single_ys)
 
-        if (len(xs_appended) > 0):
-            xs = np.append(xs, xs_appended)
-            ys = np.append(ys, ys_appended)
+                # Separate this polygon with NaN
+                xs_curr = np.append(xs_curr, np.array([float('NaN')]))
+                ys_curr = np.append(ys_curr, np.array([float('NaN')]))
 
-        return (xs, ys, rows) # list [array([])] vs. list [list([])]
+            xs.append(np.array(xs_curr))
+            ys.append(np.array(ys_curr))
 
-    return rows
+    return (np.array(xs), np.array(ys))
 
 def to_lat_lon(y, x):
     """Take mercator projection coords and return lat/lon.""" 
@@ -152,23 +144,23 @@ def to_lat_lon(y, x):
 
 def convert_shapes_to_mercator(lats, lons):
 
-    """Take mercator projection shapes and return them in lat/lon.""" 
+    """Take lat/long coords and return them in mercator projection.""" 
 
     new_lats = []
     new_lons = []
 
-    for shape_num in range(len(lats)):
-        new_c_lat = []
+    for shape_num in range(lats.size):
+        new_c_lat = []        
         new_c_lon = []
-        for i in range(len(lats[shape_num])):
-            curr_lat = lats[shape_num][i]
-            curr_lon = lons[shape_num][i]
+        for i in range((lats[int(shape_num)]).size):
+            curr_lat = lats[int(shape_num)][int(i)]
+            curr_lon = lons[int(shape_num)][int(i)]
             new_lat, new_lon = transform(Proj(init='epsg:4326'), 
                                          Proj(init='epsg:3857'), 
                                          curr_lon, curr_lat)
-            new_c_lat.append(new_lat)
-            new_c_lon.append(new_lon)
-        new_lats.append(new_c_lat)
-        new_lons.append(new_c_lon)
+            new_c_lat.append(np.array(new_lat))
+            new_c_lon.append(np.array(new_lon))
+        new_lats.append(np.array(new_c_lat))
+        new_lons.append(np.array(new_c_lon))
 
     return (np.array(new_lats), np.array(new_lons))
