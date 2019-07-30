@@ -23,11 +23,8 @@ class US_World_Grid_2_Degree_Layer(ShapeLayer):
         # Extract names
         self.cell_names = self.cells["name"].values
 
-        # Obtain the cell shapes and names in single-polygon form
-        self.cell_xs, self.cell_ys, self.cell_names = \
-                        multify(self.cells["shape"].values, 
-                                self.cell_names, 
-                                return_polygons = True)
+        # Obtain the cell shapes in single-polygon form
+        self.cell_xs, self.cell_ys = multify(self.cells["shape"].values)
 
         # Convert to mercator projection
         self.cell_xs, self.cell_ys = \
@@ -45,14 +42,13 @@ class US_World_Grid_2_Degree_Layer(ShapeLayer):
     def get_data_for_date_range(self, start_date, end_date):
 
         # Command to retrieve the day's county-wise averages
-        cmd = 'SELECT AVG(sif_avg) \
+        cmd = 'SELECT ROUND(AVG(sif_avg), 3) \
                FROM world_grid_2_degree_day_sif_facts\
                WHERE day BETWEEN \'%s\' AND \'%s\' \
                GROUP BY lon, lat \
                ORDER BY lon, lat' % (start_date, end_date)
-        sifs = np.array(query_db(cmd))
 
-        return multify(self.cells["shape"].values, sifs)
+        return np.array(query_db(cmd))
 
     # callback that will plot the time series of a selected county
     def get_patch_time_series(self, event):
@@ -68,7 +64,7 @@ class US_World_Grid_2_Degree_Layer(ShapeLayer):
                 LIMIT 1)\
                 SELECT (SELECT name from cell), \
                         day, \
-                        sif_avg FROM world_grid_2_degree_day_sif_facts \
+                        ROUND(sif_avg, 3) FROM world_grid_2_degree_day_sif_facts \
                 WHERE lon = (SELECT lon FROM cell) AND\
                 lat = (SELECT lat FROM cell)\
                 AND sif_avg IS NOT NULL\

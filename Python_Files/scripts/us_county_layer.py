@@ -24,11 +24,8 @@ class US_County_Layer(ShapeLayer):
         # Extract names
         self.county_names = self.counties["name"].values
 
-        # Obtain the county shapes and names in single-polygon form
-        self.county_xs, self.county_ys, self.county_names = \
-                        multify(self.counties["shape"].values, 
-                                self.county_names, 
-                                return_polygons = True)
+        # Obtain the county shapes in bokeh polygon form
+        self.county_xs, self.county_ys = multify(self.counties["shape"].values)
 
         # Convert to mercator projection
         self.county_xs, self.county_ys = \
@@ -44,14 +41,13 @@ class US_County_Layer(ShapeLayer):
     def get_data_for_date_range(self, start_date, end_date):
 
         # Command to retrieve the day's county-wise averages
-        cmd = 'SELECT AVG(sif_avg) \
+        cmd = 'SELECT ROUND(AVG(sif_avg), 3) \
                FROM county_day_sif_facts\
                WHERE day BETWEEN \'%s\' AND \'%s\' \
                GROUP BY shape_id \
                ORDER BY shape_id' % (start_date, end_date)
-        sifs = np.array(query_db(cmd))
 
-        return multify(self.counties["shape"].values, sifs)
+        return np.array(query_db(cmd))
 
     # callback that will plot the time series of a selected county
     def get_patch_time_series(self, event):
@@ -68,7 +64,7 @@ class US_County_Layer(ShapeLayer):
                 LIMIT 1)\
                 SELECT (SELECT name from county), \
                         day, \
-                        sif_avg FROM county_day_sif_facts \
+                        ROUND(sif_avg, 3) FROM county_day_sif_facts \
                 WHERE shape_id = (SELECT shape_id FROM county)\
                 AND sif_avg IS NOT NULL\
                 ORDER BY day;" \

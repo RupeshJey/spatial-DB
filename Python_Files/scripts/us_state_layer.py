@@ -24,11 +24,8 @@ class US_State_Layer(ShapeLayer):
         # Extract names
         self.state_names = self.states["name"].values
 
-        # Obtain the state shapes and names in single-polygon form
-        self.state_xs, self.state_ys, self.state_names = \
-                        multify(self.states["shape"].values, 
-                                self.state_names, 
-                                return_polygons = True)
+        # Obtain the state shapes in bokeh polygon form
+        self.state_xs, self.state_ys = multify(self.states["shape"].values)
 
         # Convert to mercator projection
         self.state_xs, self.state_ys = \
@@ -44,15 +41,13 @@ class US_State_Layer(ShapeLayer):
     def get_data_for_date_range(self, start_date, end_date):
 
         # Command to retrieve the day's state-wise averages
-        cmd = 'SELECT AVG(sif_avg) \
+        cmd = 'SELECT ROUND(AVG(sif_avg), 3) \
                FROM state_day_sif_facts\
                WHERE day BETWEEN \'%s\' AND \'%s\' \
                GROUP BY shape_id \
                ORDER BY shape_id' % (start_date, end_date)
 
-        sifs = np.array(query_db(cmd))
-
-        return multify(self.states["shape"].values, sifs)
+        return np.array(query_db(cmd))
 
     # callback that will plot the time series of a selected state
     def get_patch_time_series(self, event):
@@ -69,7 +64,7 @@ class US_State_Layer(ShapeLayer):
                 LIMIT 1)\
                 SELECT (SELECT name from state), \
                         day, \
-                        sif_avg FROM state_day_sif_facts \
+                        ROUND(sif_avg, 3) FROM state_day_sif_facts \
                 WHERE shape_id = (SELECT shape_id FROM state)\
                 AND sif_avg IS NOT NULL\
                 ORDER BY day;" \
