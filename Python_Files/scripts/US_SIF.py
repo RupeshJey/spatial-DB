@@ -3,24 +3,44 @@
 
 # This file handles all the code for the US SIF visualizations tab
 
-import time                            # For timing
-from datetime import date              # For date queries
-from db_utils import *                 # For easier querying
+import time                 # For timing stuff
+from datetime import date   # For date commands
+from db_utils import *      # For common database utilities
 
-from bokeh.models import LinearColorMapper          # For mapping values/colors
-from bokeh.models import ColumnDataSource           # For holding data
 from bokeh.palettes import Viridis256 as palette    # The map palette to use
 from bokeh.palettes import Category10 as time_pltt  # Time srs palette to use
 from bokeh.plotting import figure                   # For creating the map
-from bokeh.events import Tap, SelectionGeometry     # For recognizing tap
-from bokeh.layouts import row, column               # For arranging view in grid
-from bokeh.models import ColorBar, FixedTicker      # For map's color bar
-from bokeh.models import DateRangeSlider            # For date selection
-from bokeh.models import LassoSelectTool
-from bokeh.models import Panel                      # For assigning grid to view
-from bokeh.models.widgets import RadioButtonGroup   # Selecting layer
+import itertools
 
-# For mapping
+# Tap:                  For recognizing selection of shape
+# SelectionGeometry:    For custom shape selection
+# ButtonClick:          For button clicks
+from bokeh.events import Tap, SelectionGeometry, ButtonClick     
+from bokeh.layouts import row, column               # For arranging view in grid
+
+# Colorbar:             For map's color bar
+# FixedTicker:          For ticks on color bar
+# DateRangeSlider:      For date selection
+# LassoSelectToolPanel: For custom shape selection
+# Panel:                For creating a tab
+# LinearColorMapper:    For mapping values/colors
+# ColumnDataSource:     For holding data 
+# ZoomIn/OutTool:       For zooming in and out with clicks
+from bokeh.models import ColorBar, FixedTicker, DateRangeSlider, \
+                         LassoSelectTool, Panel, LinearColorMapper, \
+                         ColumnDataSource, ZoomInTool, ZoomOutTool 
+
+# To remove select time series
+from bokeh.models.renderers import GlyphRenderer
+
+# Custom saving
+from bokeh.models.callbacks import CustomJS
+
+# RadioButtonGroup:     For selecting active layer
+# Button:               For data saving widget
+from bokeh.models.widgets import RadioButtonGroup, Button   
+
+# For drawing the basemap
 from bokeh.tile_providers import get_provider, Vendors
 from bokeh.models import WMTSTileSource
 
@@ -30,11 +50,11 @@ from world_grid_2_degree_layer import US_World_Grid_2_Degree_Layer
 from us_county_layer import US_County_Layer
 from us_state_layer import US_State_Layer
 
-import shapely          # For checking shape type (Polygon/Multipolygon)
 import numpy as np      # Converting lists to np lists (bugs out otherwise)
 
-import pickle           # For saving layers
-import os.path          # For checking if path exists
+# For layer serialization
+import pickle
+import os.path
 from os import path
 
 # The date range the map should start on
@@ -42,33 +62,39 @@ START_DATE_INIT = date(2018, 9, 1)
 END_DATE_INIT = date(2018, 9, 11)
 
 # Time series scale
-SIF_MIN, SIF_MAX = (-1.5, 3.5)
+SIF_MIN, SIF_MAX = (-1.5, 4.0)
 
-# Initialize all layers
-
+# Where the layers should be stored in serialization
 LAYERS_FILE = 'layers.dump'
 
-# Load from a save file
-if path.exists(LAYERS_FILE):
-    with open(LAYERS_FILE, 'rb') as layers_file:
-        us_county_layer, us_state_layer, \
-        world_grid_2_degree_layer = pickle.load(layers_file)
-# Load from scratch
-else:
-    us_county_layer = US_County_Layer()
-    us_state_layer = US_State_Layer()
-    world_grid_2_degree_layer = US_World_Grid_2_Degree_Layer()
-    # Save the layers to file
-    with open(LAYERS_FILE, 'wb') as layers_file:
-        layers = (us_county_layer, \
-                    us_state_layer, world_grid_2_degree_layer)
-        pickle.dump(layers, layers_file)
-
-# Want the custom layer to be new every time
-custom_shapes_layer = Custom_Shapes_Layer()
+# Zooming factor for ZoomIn/Out Tools
+ZOOM_FACTOR = 0.5
 
 # Function that generates the US visualization and passes the tab to main
 def US_SIF_tab():
+
+    #################################
+    # Initialize all layers
+    #################################
+
+    # Load from a save file
+    if path.exists(LAYERS_FILE):
+        with open(LAYERS_FILE, 'rb') as layers_file:
+            us_county_layer, us_state_layer, \
+            world_grid_2_degree_layer = pickle.load(layers_file)
+    # Load from scratch
+    else:
+        us_county_layer = US_County_Layer()
+        us_state_layer = US_State_Layer()
+        world_grid_2_degree_layer = US_World_Grid_2_Degree_Layer()
+        # Save the layers to file
+        with open(LAYERS_FILE, 'wb') as layers_file:
+            layers = (us_county_layer, \
+                        us_state_layer, world_grid_2_degree_layer)
+            pickle.dump(layers, layers_file)
+
+    # Want the custom layer to be new every time
+    custom_shapes_layer = Custom_Shapes_Layer()
 
     # Set the active layer to be the county layer
     active_layer = us_county_layer
@@ -115,16 +141,20 @@ def US_SIF_tab():
                                            name = np.array([]))
 
         else:
-            # Dictionary to hold the selected shape data
-            new_source_dict = dict(
-                x= xs, y= ys,
-                name = np.array(names))
-
-            custom_data_source.data = new_source_dict
 
             # Turn off the other layers
             source.data = dict(x= np.array([]), y= np.array([]),
                 name= np.array([]), sifs= np.array([]))
+
+            # Safeguard - that at least one custom shape is drawn
+            if (xs.size != 0):
+
+                # Dictionary to hold the selected shape data
+                new_source_dict = dict(
+                    x= xs, y= ys,
+                    name = np.array(names))
+
+                custom_data_source.data = new_source_dict
 
 
     # Trigger for when a new layer is selected
@@ -260,11 +290,17 @@ def US_SIF_tab():
 
     # Color mapper
     color_mapper = LinearColorMapper(palette=palette, low = -1, high = 3)
+    color_transform = {'field': 'sifs', 'transform': color_mapper}
 
     # Patch all the information onto the map
-    p.patches('x', 'y', source=source,
-              fill_color={'field': 'sifs', 'transform': color_mapper},
-              fill_alpha=0.9, line_color="white", line_width=0.1)
+    patch_renderer = p.patches('x', 'y', source=source,
+                      fill_color=color_transform,
+                      fill_alpha=0.9, line_color="white", line_width=0.1, 
+                      selection_fill_alpha = 1.0, 
+                      selection_fill_color = color_transform,
+                      nonselection_line_color="black",
+                      nonselection_fill_alpha=0.7,
+                      nonselection_fill_color= color_transform)
     p.title.text_font_size = '16pt'
 
     # Add a color bar
@@ -272,6 +308,10 @@ def US_SIF_tab():
     color_bar = ColorBar(color_mapper=color_mapper, ticker = ticker,
                      label_standoff=12, border_line_color=None, location=(0,0))
     p.add_layout(color_bar, 'right')
+
+    # Add zoom in / out tools
+    p.add_tools(ZoomInTool(factor=ZOOM_FACTOR))
+    p.add_tools(ZoomOutTool(factor=ZOOM_FACTOR))
 
     #################################
     # Set up custom plot data
@@ -291,6 +331,10 @@ def US_SIF_tab():
     # Set up time series
     #################################
 
+    def color_gen():
+        yield from itertools.cycle(time_pltt[10])
+    color = color_gen()
+
     def shape_drawn(event):
 
         # Check if more than one point
@@ -299,46 +343,69 @@ def US_SIF_tab():
 
             # Notify the custom selection layer that this
             # shape was selected and obtain relevant info
-            custom_shapes_layer.shape_selected(event)
+            # custom_shapes_layer.patch_selected(event)
 
             # Change to the custom layer
             layer_selector.active = 0
             layer_selected(0)
 
-            # Set the title of the Time Series plot and the appropriate 
-            # time series data source
-            sif_series.title.text, time_srs_src.data = \
-                custom_shapes_layer.get_patch_time_series(None)
+            # Notify the layer that this patch was created. 
+            active_layer.patch_created(event)
+
+            # Clear all time series
+            sif_series.renderers = []
+
+            # Update the title and get new data from the active layer
+            sif_series.title.text, time_srs_src_list, names = \
+                                active_layer.patch_clicked(source, None)
+
+            # Plot each series returned
+            for i in range(len(time_srs_src_list)):
+                sif_series.scatter('date', 'sif', 
+                                    source=time_srs_src_list[i], 
+                                    color=time_pltt[10][i])
+            # Make sure the current shape is drawn
+            refresh_page()
 
     def patch_clicked(event):
         """ When a patch is clicked, update the time series chart. """
-        sif_series.title.text, time_srs_src.data = \
-                            active_layer.get_patch_time_series(event)
 
-    # Source of the time-series data should be empty for now
-    time_srs_src = ColumnDataSource(data=dict(date=np.array([]), 
-                                              sif=np.array([])))
+        # Clear all time series
+        sif_series.renderers = []
+
+        # Update the title and get new data from the active layer
+        sif_series.title.text, time_srs_src_list, names = \
+                            active_layer.patch_clicked(source, event)
+
+        # Plot each series returned
+        for i in range(len(time_srs_src_list)):
+            sif_series.scatter('date', 'sif', 
+                                source=time_srs_src_list[i], 
+                                color=time_pltt[10][i])
 
     # Which tools should be available to the user for the timer series
-    TOOLS = "pan,wheel_zoom,reset,hover,save,tap"
+    TOOLS = "pan,wheel_zoom,reset,hover,save"
 
     # Figure that holds the time-series
     sif_series = figure(plot_width=750, plot_height=400, x_axis_type='datetime',
                         tools=TOOLS, 
                         title= "SIF Time-Series (Select a county...)",
                         active_scroll = "wheel_zoom",
+                        tooltips=[
+                            ("Day", "@date"), 
+                            ("Average SIF", "@sif")
+                        ],
                         x_axis_label = 'Date',
                         y_axis_label = 'SIF Average',
                         y_range = (SIF_MIN, SIF_MAX))
-
-    # Has scatter plot linked with the time series source
-    sif_series.scatter('date', 'sif', 
-                        source=time_srs_src, color = 'green')
 
     # Some font choices
     sif_series.title.text_font_size = '16pt'
     sif_series.xaxis.axis_label_text_font_size = "12pt"
     sif_series.yaxis.axis_label_text_font_size = "12pt"
+
+    # Policy for hovering
+    sif_series.hover.point_policy = "follow_mouse"
 
     # No logo
     sif_series.toolbar.logo = None
@@ -352,11 +419,25 @@ def US_SIF_tab():
     p.on_event(SelectionGeometry, shape_drawn)
 
     #################################
+    # TODO: Set up download area
+    #################################
+    # def save_data():
+    #     active_layer.save_data()
+    #     print("Button Clicked")
+
+    # callback = active_layer.get_save_data_js_callback()
+
+    button = Button(label="Save Data", button_type="success")
+    # button.on_click(active_layer.save_data)
+    #button.js_on_event(ButtonClick, callback)
+
+    #################################
     # Set up tab
     #################################
 
     # The layout of the view
-    layout = row(column(p, date_range_slider, layer_selector), sif_series)
+    layout = row(column(p, date_range_slider, layer_selector), 
+                 column(sif_series, row(column(), button)))
 
     # Create tab using layout
     tab = Panel(child=layout, title = 'US Visualization')

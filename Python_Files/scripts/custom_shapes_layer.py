@@ -4,22 +4,28 @@
 # This class contains all the respective functions for a layer with 
 # custom shapes (user-selected using selection tool)
 
-from shapelayer import ShapeLayer
+# from shape_layer import ShapeLayer
 from db_utils import *  # For easier querying
 import numpy as np      # Math array things
 
-class Custom_Shapes_Layer(ShapeLayer):
+class Custom_Shapes_Layer():
 
     def __init__(self):
 
         # Set up all necessary lists
         self.name = 'Custom Shapes'
+        self.none_selected_str = "SIF Time-Series (Select a shape...)"
+        self.multiple_selected_str = "SIF Time-Series in Multiple Shapes"
         self.start_date, self.end_date = ('2019-06-01', '2019-06-29')
         self.xs = []
         self.ys = []
         self.series = []
         self.names = []
         self.polygon_strs = []
+
+        # Initialize currently selected patches (indices and series)
+        self.selected_patches = dict(selected_indices=[], active_sources=[],
+                                     names=[])
 
     # Given a date range, this function returns the average sif for the shapes
     # in the specified range
@@ -32,7 +38,8 @@ class Custom_Shapes_Layer(ShapeLayer):
         # If we just want to display the last-drawn shape
         # (No event triggered this)
         if (event == None):
-            return ("SIF Time-Series in %s" % (self.names[-1]), self.series[-1]) 
+            return ("SIF Time-Series in %s" % (self.names[-1]), 
+                    [self.series[-1]], []) 
 
         # If we want to find the actually clicked-on polygon
         # Go through every shape in the list of polygons
@@ -56,10 +63,11 @@ class Custom_Shapes_Layer(ShapeLayer):
             # If the click was inside this polygon, return the associated data
             if result == (True,):
                 return ("SIF Time-Series in %s" % \
-                                (self.names[i]), self.series[i]) 
+                                (self.names[i]), [self.series[i]], []) 
 
         # If none of the polygons matched, return default parameters
-        return ("Select a region...", dict(date=np.array([]), sif=np.array([]))) 
+        return (self.none_selected_str, 
+                [dict(date=np.array([]), sif=np.array([]))], []) 
     
     def get_map_details(self):
         """Return initial properties of the map (xs, ys, names)."""
@@ -69,8 +77,7 @@ class Custom_Shapes_Layer(ShapeLayer):
         """Return the valid date range of this layer."""
         return (self.start_date, self.end_date)
 
-    def shape_selected(self, event):
-
+    def patch_created(self, event):
         # Obtain selected geometry
         xs_curr = np.array(list(event.geometry['x'].values()))
         ys_curr = np.array(list(event.geometry['y'].values()))
@@ -101,10 +108,13 @@ class Custom_Shapes_Layer(ShapeLayer):
         cmd = " WITH region AS (SELECT ST_GeomFromText(\'%s\') AS shape)\
                 SELECT date_trunc('day', time), \
                         ROUND(AVG(sif), 3) FROM tropomi_sif \
-                WHERE ((SELECT shape FROM region) && center_pt) \
-                        AND ST_CONTAINS((SELECT shape FROM region), center_pt)\
+                WHERE (\
+                    (SELECT shape FROM region) && center_pt) \
+                     AND ST_CONTAINS((SELECT shape FROM region), center_pt)\
                 GROUP BY date_trunc('day', time)\
                 ORDER BY date_trunc('day', time);" % polygon_str
+
+        # return super().get_patch_time_series(cmd)
 
         # Query and obtain results
         result = query_db(cmd)
@@ -119,3 +129,7 @@ class Custom_Shapes_Layer(ShapeLayer):
 
         # Append this dict to the list of series
         self.series.append(dict(date=dates, sif=sifs))
+
+    def patch_clicked(self, source, event):
+
+        return self.get_patch_time_series(event)

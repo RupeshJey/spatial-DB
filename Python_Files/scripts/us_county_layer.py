@@ -4,37 +4,32 @@
 # This class contains all the respective functions for the US County 
 # layer
 
-from shapelayer import ShapeLayer
+from shape_layer import ShapeLayer
 from db_utils import *  # For easier querying
 import shapely          # For checking shape type (Polygon/Multipolygon)
 import numpy as np      # Math array things
 
+# Custom saving
+from bokeh.models.callbacks import CustomJS
+
 class US_County_Layer(ShapeLayer):
 
     def __init__(self):
-        self.name = 'US Counties'
+        
+        self.name = 'County'
+        self.none_selected_str = "SIF Time-Series (Select a county...)"
+        self.multiple_selected_str = "SIF Time-Series in Multiple Counties"
 
         # Command to retrieve all the county shapes
-        cmd = 'SELECT * FROM shapes WHERE type = \'County\' \
-               ORDER BY shape_id'
-
-        # Execute query and obtain results
-        self.counties = spatial_query_db(cmd)
-
-        # Extract names
-        self.county_names = self.counties["name"].values
-
-        # Obtain the county shapes in bokeh polygon form
-        self.county_xs, self.county_ys = multify(self.counties["shape"].values)
-
-        # Convert to mercator projection
-        self.county_xs, self.county_ys = \
-                    convert_shapes_to_mercator(self.county_ys, self.county_xs)
+        cmd_shapes = 'SELECT * FROM shapes WHERE type = \'County\' \
+                      ORDER BY shape_id'
 
         # Query to obtain first and last day recorded
-        cmd = 'SELECT MIN(day) AS min, MAX(day) AS max \
-               FROM county_day_sif_facts'
-        self.start_date, self.end_date = query_db(cmd)
+        cmd_day_range = 'SELECT MIN(day) AS min, MAX(day) AS max \
+                         FROM county_day_sif_facts'
+
+        # Initialize the class using these commands
+        super().__init__(cmd_shapes, cmd_day_range)
 
     # Given a date range, this function returns the average sif for the counties
     # in the specified range
@@ -66,31 +61,60 @@ class US_County_Layer(ShapeLayer):
                         day, \
                         ROUND(sif_avg, 3) FROM county_day_sif_facts \
                 WHERE shape_id = (SELECT shape_id FROM county)\
-                AND sif_avg IS NOT NULL\
                 ORDER BY day;" \
                 % (coord_x, coord_y, coord_x, coord_y)
 
-        # Obtain results
-        result = query_db(cmd)
+        return super().get_patch_time_series(cmd)
 
-        # If empty, clear and return
-        if len(result) == 0:
-            return ("SIF Time-Series (Select a county...)", 
-                    dict(date=[], sif=[]))
+    def save_data(self):
+        """Save selected data in NetCDF format"""
+        # Command to get the download data
+        pass
+        
 
-        # Map the rows to columns and take series
-        mapped_result = [list(i) for i in zip(*result)]
-        county_name, dates, sifs = (result[0][0], mapped_result[1], 
-                                    mapped_result[2])
+    # def get_save_data_js_callback(self):
 
-        # Return new title and time series
-        return ("SIF Time-Series in County: %s" % (county_name), 
-                dict(date=dates, sif=sifs))
-    
-    def get_map_details(self):
-        """Return initial properties of the map (xs, ys, names)."""
-        return self.county_xs, self.county_ys, self.county_names
+    #     cmd =   "SELECT name, state, day, sif_avg\
+    #              FROM county_day_sif_facts NATURAL JOIN shapes\
+    #              WHERE sif_avg IS NOT NULL\
+    #              ORDER BY day, state, name LIMIT 1;" 
 
-    def get_date_range(self):
-        """Return the valid date range of this layer."""
-        return (self.start_date, self.end_date)
+    #     # Get data
+    #     df = pandas_query_db(cmd)
+
+    #     value = df.to_csv(header=False).replace("\n", "").split(",")
+    #     print(value)
+
+
+    #     callback = CustomJS(args = dict(rows = [["name1", "city1", "some other info"],["name2", "city2", "more info"]]), code="""
+
+    #         let csvContent = "data:text/csv;charset=utf-8,";
+
+    #         @rows.forEach(function(rowArray) {
+    #             let row = rowArray.join(",");
+    #             csvContent += row + "\r\n";
+    #         });
+
+    #         var encodedUri = encodeURI(csvContent);
+    #         var link = document.createElement("a");
+    #         link.setAttribute("href", encodedUri);
+    #         link.setAttribute("download", "my_data.csv");
+    #         document.body.appendChild(link); // Required for FF
+
+    #         link.click(); // This will download the data file named "my_data.csv".
+
+    #         """)
+
+    #     return callback
+        # const rows = [
+        #         ["name1", "city1", "some other info"],
+        #         ["name2", "city2", "more info"]
+        #     ];
+
+        #     var lineArray = [];
+        #     rows.forEach(function (infoArray, index) {
+        #         var line = infoArray.join(",");
+        #         lineArray.push(index == 0 ? "data:text/csv;charset=utf-8," + line : line);
+        #     });
+        #     var csvContent = lineArray.join("\\n");
+
