@@ -40,6 +40,9 @@ file_num = 1
 START_NUM = 0
 END_NUM = 10000
 
+# How often to commit changes
+COMMIT_FREQUENCY = 1
+
 # Loop over each data file in the directory 
 for file in reversed(sorted(os.listdir(SOURCE))):
     if file.endswith('.nc'):
@@ -60,6 +63,8 @@ for file in reversed(sorted(os.listdir(SOURCE))):
             cloud_fractions = np.array(nc_file.variables['cloud_fraction'])
             szas = np.array(nc_file.variables['sza'])
             vzas = np.array(nc_file.variables['vza'])
+            nirs = np.array(nc_file.variables['NIR'])
+            saas = np.array(nc_file.variables['saa'])
             phase_angles = np.array(nc_file.variables['phase_angle'])
             dcfs = np.array(nc_file.variables['daily_correction_factor'])
             lats = np.array(nc_file.variables['lat'])
@@ -99,7 +104,8 @@ for file in reversed(sorted(os.listdir(SOURCE))):
                 args.append((date, float(sifs[i]), float(sif_errs[i]), 
                              float(sif_rels[i]), float(dcSIFs[i]), 
                              float(cloud_fractions[i]), float(szas[i]), 
-                             float(vzas[i]), float(phase_angles[i]), 
+                             float(vzas[i]), float(nirs[i]), float(saas[i]),
+                             float(phase_angles[i]), 
                              float(dcfs[i]), 
                              'Point(%f %f)' % (float(lons[i]), float(lats[i])),
                              'Polygon((%f %f, %f %f, %f %f, %f %f, %f %f))' % 
@@ -124,13 +130,13 @@ for file in reversed(sorted(os.listdir(SOURCE))):
             # This runs a lot faster than running one execution at a time
             dbapi.extras.execute_values(cursor, "INSERT INTO tropomi_sif \
                 (time, sif, sif_err, sif_relative, dcsif, cloud_fraction, \
-                sza, vza, phase_angle, dcf, center_pt, mbr) VALUES %s", 
-                args)
+                sza, vza, nir, saa, phase_angle, dcf, center_pt, mbr) \
+                VALUES %s", args)
 
             # Notify the user of how long it took to insert the data
             print("Inserting the file took %i seconds" % (time.time() - t0))
 
-            if file_num % 5 == 0:
+            if file_num % COMMIT_FREQUENCY == 0:
                 # Commit all changes to the database
                 connection.commit()
 

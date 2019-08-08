@@ -25,6 +25,8 @@ CREATE TABLE tropomi_SIF (
     cloud_fraction  NUMERIC(3, 2)       NOT NULL,
     sza             NUMERIC(3, 1)       NOT NULL,
     vza             NUMERIC(3, 1)       NOT NULL,
+    nir             NUMERIC(8, 4)       NOT NULL,
+    saa             NUMERIC(8, 4)       NOT NULL,
     phase_angle     NUMERIC(4, 1)       NOT NULL,
     dcf             NUMERIC(5, 4)       NOT NULL,
 
