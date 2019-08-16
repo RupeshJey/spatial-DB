@@ -5,8 +5,8 @@
 # custom shapes (user-selected using selection tool)
 
 # from shape_layer import ShapeLayer
-from db_utils import *  # For easier querying
-import numpy as np      # Math array things
+from db_utils import *   # For easier querying
+import numpy as np       # Math array things
 
 class Custom_Shapes_Layer():
 

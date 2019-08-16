@@ -19,7 +19,7 @@ import re                       # For string-parsing the JSON in csv
 # For getting the connection details (stored abstractly)
 from connection_info import conn
 
-SOURCE = '../Shape_Outlines/'   # Where to find the data
+SOURCE = '../../Shape_Outlines/'   # Where to find the data
 
 # Specific files to use
 COUNTRY_FILE = 'gz_2010_us_outline.json'
@@ -80,9 +80,9 @@ for i in range(NUM_STATES):
     sys.stdout.flush()
 
     # Construct SQL query to insert the shape
-    cmd = 'INSERT INTO shapes VALUES (DEFAULT, \'%s\', \'%s\', \
+    cmd = 'INSERT INTO shapes VALUES (DEFAULT, \'%s\', \'%s\', \'%s\', \
                    ST_GeomFromGeoJSON(\'%s\'));' % \
-                   (name, "State", str(geom).replace("\'", "\""))
+                   ("State", name, "State", str(geom).replace("\'", "\""))
 
     # Execute that query
     cursor.execute(cmd)
@@ -125,6 +125,7 @@ with open(file, newline='') as csvfile:
 
         # Extract the name and geometry of the county
         name = row[0].split(',')[0].replace("'", "")
+        state = row[0].split(',')[1].replace("'", "")
         geom = '{' + re.search('{(.*)}', row[0]).group(1) + '}'
         geom = json.loads(geom.replace('\"\"', '\"'))
 
@@ -139,9 +140,9 @@ with open(file, newline='') as csvfile:
         sys.stdout.flush()
 
         # Construct SQL query to insert the shape
-        cmd = 'INSERT INTO shapes VALUES (DEFAULT, \'%s\', \'%s\', \
+        cmd = 'INSERT INTO shapes VALUES (DEFAULT, \'%s\', \'%s\', \'%s\', \
                        ST_GeomFromGeoJSON(\'%s\'));' % \
-                       (name, "County", str(geom).replace("\'", "\""))
+                       (state, name, "County", str(geom).replace("\'", "\""))
 
         # Execute that query
         cursor.execute(cmd)

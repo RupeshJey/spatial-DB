@@ -43,8 +43,8 @@ WITH counties AS (
 -- Extract the day range we want (min to max)
 day_range AS (
     SELECT date_trunc('day', dd):: date AS day
-    FROM generate_series ( (SELECT MIN(time) FROM tropomi_SIF) 
-                            , (SELECT MAX(time) FROM tropomi_SIF)
+    FROM generate_series ( '2019-07-01'
+                            , (SELECT MAX(time) FROM tropomi_sif)
                             , '1 day'::interval) dd
 )
 -- Direct output into facts table

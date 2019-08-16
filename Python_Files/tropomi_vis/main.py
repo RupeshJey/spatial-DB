@@ -10,10 +10,10 @@ from bokeh.io import curdoc
 from bokeh.models.widgets import Tabs
 
 # Each tab is drawn by one script
-from scripts.US_SIF import US_SIF_tab
+from SIF_Explorer import SIF_Explorer_tab
 
 # Create each tab
-tab1 = US_SIF_tab()
+tab1 = SIF_Explorer_tab()
 
 # Put all the tabs together
 tabs = Tabs(tabs = [tab1])

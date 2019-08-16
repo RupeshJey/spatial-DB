@@ -47,7 +47,7 @@ i = 1
 total = sum(1 for file in os.listdir(SOURCE) if file.endswith(".bil")) 
 
 # For each elevation file
-for filename in os.listdir(SOURCE):
+for filename in sorted(os.listdir(SOURCE)):
     if filename.endswith(".bil"): 
 
         # Notify user that we are looking at said file
@@ -56,13 +56,23 @@ for filename in os.listdir(SOURCE):
         # Start the timer
         t0 = time.time()
 
-        # The index should only be generated once
+        # The raster index should only be generated once
         flag = ""
         if i == 1:
             flag = "-I"
 
+        cmd = "CREATE TABLE elevation_rasters (\
+                    rid       SERIAL    NOT NULL,\
+                    rast      RASTER    NOT NULL, \
+                    filename  TEXT      NOT NULL,\
+                    PRIMARY KEY (rid)\
+                );"
+
+        cursor.execute("DROP TABLE IF EXISTS elevation_rasters; %s" % cmd)
+        connection.commit()
+
         # Create the sql script to input the raster
-        os.system("/usr/pgsql-11/bin/raster2pgsql -F -a %s -s 0 \
+        os.system("/usr/pgsql-11/bin/raster2pgsql -F -a %s -s 0 -t 1000x1000\
                     %s elevation_rasters > raster_maker.sql" % (flag, filename)) 
 
         # Input the raster
@@ -72,18 +82,24 @@ for filename in os.listdir(SOURCE):
 
         print("Converting raster to points...")
 
-        # Create command to save points and aspects into database
-        cmd = " WITH slopes AS \
-                 (SELECT rid, (ST_PixelAsPoints(rast)).*, \
-                              (ST_PixelAsPoints(ST_Slope(rast))).val AS sval,\
-                              (ST_PixelAsPoints(ST_Aspect(rast))).val AS aval\
-                  FROM elevation_rasters WHERE rid = %i)\
-                INSERT INTO elevation_points \
-                                (rid, center_pt, elevation, slope, aspect)\
-                SELECT rid, geom, val, sval, aval FROM slopes;" % i
+        for j in range(36):
 
-        # Execute said command
-        cursor.execute(cmd)
+            print("Portion %i" %j )
+
+            # Create command to save points and aspects into database
+            cmd = " WITH slopes AS \
+                     (SELECT rid, (ST_PixelAsPoints(rast)).*, \
+                                  (ST_PixelAsPoints(ST_Slope(rast, 1, '32BF', \
+                                            'DEGREES', 370400))).val AS sval,\
+                                  (ST_PixelAsPoints(ST_Aspect(rast))).val \
+                                             AS aval\
+                      FROM elevation_rasters WHERE rid = %i)\
+                    INSERT INTO elevation_points \
+                                    (rid, center_pt, elevation, slope, aspect)\
+                    SELECT rid, geom, val, sval, aval FROM slopes;" % (j + 1)
+
+            # Execute said command
+            cursor.execute(cmd)
 
         # Notify the user of how long it took to insert the data
         print("Inserting the records took %i seconds" % (time.time() - t0))
@@ -91,5 +107,4 @@ for filename in os.listdir(SOURCE):
         # Commit the transaction to the database
         connection.commit()
 
-        # Increment file counter
         i += 1

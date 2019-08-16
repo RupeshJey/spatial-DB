@@ -71,7 +71,7 @@ LAYERS_FILE = 'layers.dump'
 ZOOM_FACTOR = 0.5
 
 # Function that generates the US visualization and passes the tab to main
-def US_SIF_tab():
+def SIF_Explorer_tab():
 
     #################################
     # Initialize all layers
@@ -281,7 +281,8 @@ def US_SIF_tab():
     # Add the map!
     p.add_tile(tile_provider)
 
-    p.lod_threshold = None          # No downsampling
+    #p.lod_threshold = None          # No downsampling
+    p.lod_interval = 150
     p.toolbar.logo = None           # No logo
     p.grid.grid_line_color = None   # No grid
 

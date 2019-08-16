@@ -29,9 +29,9 @@ connection = dbapi.connect(port= conn['port'],
 cursor = connection.cursor()
 
 # Clear database first (temporary line)
-os.system("PGPASSWORD=%s psql -U %s -p %s -d %s -f \
-           ../SQL_Scripts/make_SIF_tables.sql " % 
-           (conn['password'], conn['user'], conn['port'], conn['database']))
+# os.system("PGPASSWORD=%s psql -U %s -p %s -d %s -f \
+#            ../SQL_Scripts/make_SIF_tables.sql " % 
+#            (conn['password'], conn['user'], conn['port'], conn['database']))
 
 # Which number file we are working on
 file_num = 1
@@ -45,7 +45,7 @@ COMMIT_FREQUENCY = 1
 
 # Loop over each data file in the directory 
 for file in reversed(sorted(os.listdir(SOURCE))):
-    if file.endswith('.nc'):
+    if file.endswith('.nc') and file.startswith('TROPO_SIF_2019-07'):
         if file_num > START_NUM and file_num <= END_NUM:
             # Starting time for inserting file
             t0 = time.time()

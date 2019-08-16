@@ -14,6 +14,9 @@ CREATE TABLE shapes (
     -- Auto-incrementing shape id
     shape_id        SERIAL, 
 
+    -- Name of corresponding state (can be null)
+    state           VARCHAR(100),
+
     -- Name of shape
     name            VARCHAR(100)          NOT NULL,
 
