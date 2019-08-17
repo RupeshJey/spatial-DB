@@ -30,7 +30,7 @@ cursor = connection.cursor()
 
 # Clear database first (temporary line)
 # os.system("PGPASSWORD=%s psql -U %s -p %s -d %s -f \
-#            ../SQL_Scripts/make_SIF_tables.sql " % 
+#            ../../make_TROPOMI_tables/SQL_Scripts/make_SIF_tables.sql " % 
 #            (conn['password'], conn['user'], conn['port'], conn['database']))
 
 # Which number file we are working on
@@ -38,15 +38,21 @@ file_num = 1
 
 # Option to split scripts, to insert only subset of records
 START_NUM = 0
-END_NUM = 10000
+END_NUM = 100000
+
+# Obtain list of files already inserted
+cursor.execute('SELECT * FROM tropomi_SIF_files_loaded;')
+files_loaded = list(cursor)
 
 # How often to commit changes
 COMMIT_FREQUENCY = 1
 
 # Loop over each data file in the directory 
 for file in reversed(sorted(os.listdir(SOURCE))):
-    if file.endswith('.nc') and file.startswith('TROPO_SIF_2019-07'):
-        if file_num > START_NUM and file_num <= END_NUM:
+    #they are actual nc files 
+    if file.endswith('.nc') and file_num > START_NUM and file_num <= END_NUM: 
+        # Make sure we haven't added this file already
+        if (file not in files_loaded):
             # Starting time for inserting file
             t0 = time.time()
 
@@ -133,12 +139,17 @@ for file in reversed(sorted(os.listdir(SOURCE))):
                 sza, vza, nir, saa, phase_angle, dcf, center_pt, mbr) \
                 VALUES %s", args)
 
+            # Add this file name to the list of files already added
+            cursor.execute("INSERT INTO tropomi_CH4_files_loaded VALUES (\'%s\');" % file) 
+
+            # Commit all changes
+            connection.commit()
+
             # Notify the user of how long it took to insert the data
             print("Inserting the file took %i seconds" % (time.time() - t0))
 
-            if file_num % COMMIT_FREQUENCY == 0:
-                # Commit all changes to the database
-                connection.commit()
+        else:
+            print("File: %s has already been loaded" % file)
 
         # Increment file number that we are working on
         file_num += 1

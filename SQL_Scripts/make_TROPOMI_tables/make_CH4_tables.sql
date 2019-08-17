@@ -1,11 +1,21 @@
 -- Rupesh Jeyaram 
 -- Created June 18th, 2019
 -- Modified by yiyin Aug 7th, 2019
+
 -- DROP TABLE statements
 
+DROP TABLE IF EXISTS tropomi_CH4_files_loaded; 
 DROP TABLE IF EXISTS tropomi_CH4;
 
 -- CREATE TABLE statements
+
+-- tropomi_CH4_files_loaded contains the names of all files that 
+-- have been imported already
+
+CREATE TABLE tropomi_CH4_files_loaded (
+    -- File's name as length 100 varchar; must be unique
+    filename        VARCHAR(100)        PRIMARY KEY
+);
 
 -- tropomi_CH4 holds all the data from the CH4 records
 
@@ -104,10 +114,10 @@ CREATE TABLE tropomi_CH4_y2019_m12 PARTITION OF tropomi_CH4
 -- Tradeoffs! 
 
 -- Index on the center points of the data
-CREATE INDEX center_points_idx
+CREATE INDEX tropomi_ch4_center_points_idx
   ON tropomi_CH4
   USING GIST (center_pt);
 
 -- Index on the timestamp of the data
-CREATE INDEX time_idx
+CREATE INDEX tropomi_ch4_time_idx
   ON tropomi_CH4 (time);

@@ -3,9 +3,18 @@
 
 -- DROP TABLE statements
 
+DROP TABLE IF EXISTS tropomi_SIF_files_loaded; 
 DROP TABLE IF EXISTS tropomi_SIF;
 
 -- CREATE TABLE statements
+
+-- tropomi_SIF_files_loaded contains the names of all files that 
+-- have been imported already
+
+CREATE TABLE tropomi_SIF_files_loaded (
+    -- File's name as length 100 varchar; must be unique
+    filename        VARCHAR(100)        PRIMARY KEY
+)
 
 -- tropomi_SIF holds all the data from the SIF records
 
@@ -107,10 +116,10 @@ CREATE TABLE tropomi_SIF_y2019_m12 PARTITION OF tropomi_SIF
 -- Tradeoffs! 
 
 -- Index on the center points of the data
-CREATE INDEX center_points_idx
+CREATE INDEX tropomi_sif_center_points_idx
   ON tropomi_SIF
   USING GIST (center_pt);
 
 -- Index on the timestamp of the data
-CREATE INDEX time_idx
+CREATE INDEX tropomi_sif_time_idx
   ON tropomi_SIF (time);
