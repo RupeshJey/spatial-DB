@@ -30,7 +30,7 @@ cursor = connection.cursor()
 
 # Clear database first (temporary line)
 # os.system("PGPASSWORD=%s psql -U %s -p %s -d %s -f \
-#            ../../make_TROPOMI_tables/SQL_Scripts/make_SIF_tables.sql " % 
+#            ../../SQL_Scripts/make_TROPOMI_tables/make_SIF_tables.sql " % 
 #            (conn['password'], conn['user'], conn['port'], conn['database']))
 
 # Which number file we are working on
@@ -40,10 +40,6 @@ file_num = 1
 START_NUM = 0
 END_NUM = 100000
 
-# Obtain list of files already inserted
-cursor.execute('SELECT * FROM tropomi_SIF_files_loaded;')
-files_loaded = list(cursor)
-
 # How often to commit changes
 COMMIT_FREQUENCY = 1
 
@@ -51,6 +47,12 @@ COMMIT_FREQUENCY = 1
 for file in reversed(sorted(os.listdir(SOURCE))):
     #they are actual nc files 
     if file.endswith('.nc') and file_num > START_NUM and file_num <= END_NUM: 
+
+        
+        # Obtain list of files already inserted
+        cursor.execute('SELECT * FROM tropomi_SIF_files_loaded;')
+        files_loaded = list(cursor)
+
         # Make sure we haven't added this file already
         if (file not in files_loaded):
             # Starting time for inserting file
@@ -71,6 +73,7 @@ for file in reversed(sorted(os.listdir(SOURCE))):
             vzas = np.array(nc_file.variables['vza'])
             nirs = np.array(nc_file.variables['NIR'])
             saas = np.array(nc_file.variables['saa'])
+            raas = np.array(nc_file.variables['raa'])
             phase_angles = np.array(nc_file.variables['phase_angle'])
             dcfs = np.array(nc_file.variables['daily_correction_factor'])
             lats = np.array(nc_file.variables['lat'])
@@ -111,7 +114,7 @@ for file in reversed(sorted(os.listdir(SOURCE))):
                              float(sif_rels[i]), float(dcSIFs[i]), 
                              float(cloud_fractions[i]), float(szas[i]), 
                              float(vzas[i]), float(nirs[i]), float(saas[i]),
-                             float(phase_angles[i]), 
+                             float(phase_angles[i]), float(raas[i]), 
                              float(dcfs[i]), 
                              'Point(%f %f)' % (float(lons[i]), float(lats[i])),
                              'Polygon((%f %f, %f %f, %f %f, %f %f, %f %f))' % 
@@ -136,11 +139,11 @@ for file in reversed(sorted(os.listdir(SOURCE))):
             # This runs a lot faster than running one execution at a time
             dbapi.extras.execute_values(cursor, "INSERT INTO tropomi_sif \
                 (time, sif, sif_err, sif_relative, dcsif, cloud_fraction, \
-                sza, vza, nir, saa, phase_angle, dcf, center_pt, mbr) \
+                sza, vza, nir, saa, phase_angle, raa, dcf, center_pt, mbr) \
                 VALUES %s", args)
 
             # Add this file name to the list of files already added
-            cursor.execute("INSERT INTO tropomi_CH4_files_loaded VALUES (\'%s\');" % file) 
+            cursor.execute("INSERT INTO tropomi_SIF_files_loaded VALUES (\'%s\');" % file) 
 
             # Commit all changes
             connection.commit()
