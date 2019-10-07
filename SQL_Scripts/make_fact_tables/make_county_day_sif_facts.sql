@@ -18,10 +18,11 @@ CREATE TABLE county_day_sif_facts (
     -- The day that this fact is associated with
     day         DATE            NOT NULL, 
 
-    -- The average SIF value for this county-day combination
+    -- The average SIF values for this county-day combination
     -- This value *can* be NULL, when there are no measurements for 
     -- a county-day combo
-    sif_avg     NUMERIC(5, 3),
+    sif_avg     NUMERIC(5, 3),      -- Actual sif average
+    dcsif_avg   NUMERIC(5, 3),      -- Including the daily corrected sif
 
     -- A fact is uniquely identified by a county-day combination
     -- There should not be any duplicates of these values
@@ -43,23 +44,23 @@ WITH counties AS (
 -- Extract the day range we want (min to max)
 day_range AS (
     SELECT date_trunc('day', dd):: date AS day
-    FROM generate_series ( '2019-07-01'
+    FROM generate_series ( (SELECT MIN(time) FROM tropomi_sif)
                             , (SELECT MAX(time) FROM tropomi_sif)
                             , '1 day'::interval) dd
 )
 -- Direct output into facts table
 INSERT INTO county_day_sif_facts
 -- Select out shape_id and day (to match the facts table)
-SELECT shape_id, day, 
--- Obtain the average sif value for this 
-(
-    SELECT AVG(sif) 
+SELECT shape_id, day, avg_sif, avg_dcsif
+-- Cross counties and days, so we have each possible combination (allows nulls)
+FROM counties, day_range, 
+-- Joined with the average sif values for this 
+LATERAL (
+    SELECT AVG(sif) AS avg_sif, AVG(dcsif) AS avg_dcsif
     FROM tropomi_sif
     WHERE ST_X(center_pt) > -130 AND                       -- Exclude Alaska
           shape && center_pt AND                           -- Match county shape
           ST_CONTAINS(shape, center_pt) AND                -- Match shape  
           time BETWEEN day AND (day + INTERVAL '1 day')    -- Match day
-) AS avg_sif
--- Cross counties and days, so we have each possible combination (allows nulls)
-FROM counties CROSS JOIN day_range;
+) AS aggregates;
 
