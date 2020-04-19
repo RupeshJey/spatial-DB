@@ -15,6 +15,15 @@ from connection_info import conn
 # Where to find the data
 SOURCE = '/net/fluo/data3/HydroSheds_3s_con'   
 
+########################################################################
+# Create tables
+########################################################################
+
+# Set up the tables
+os.system("PGPASSWORD=%s psql -U %s -p %s -d %s -f \
+           ../../SQL_Scripts/make_elevation_tables/make_world_elevation_tables.sql" % 
+           (conn['password'], conn['user'], conn['port'], conn['database']))
+
 # Connect to database
 connection = dbapi.connect(port= conn['port'], 
                      user= conn['user'],
@@ -23,15 +32,6 @@ connection = dbapi.connect(port= conn['port'],
 
 # Cursor to execute queries and read output
 cursor = connection.cursor()
-
-########################################################################
-# Create databases
-########################################################################
-
-# Set up the database itself
-os.system("PGPASSWORD=%s psql -U %s -p %s -d %s -f \
-           ../SQL_Scripts/make_world_elevation_tables.sql" % 
-           (conn['password'], conn['user'], conn['port'], conn['database']))
 
 ########################################################################
 # Input all rasters, into point form
@@ -43,12 +43,19 @@ os.chdir(SOURCE)
 # File counter
 i = 1
 
+# files_to_load = ['n05e075_con.bil', 'n05e080_con.bil']
+
 # Total number of files to look through
 total = sum(1 for file in os.listdir(SOURCE) if file.endswith(".bil")) 
 
 # For each elevation file
-for filename in sorted(os.listdir(SOURCE)):
-    if filename.endswith(".bil"): 
+for filename in sorted([f for f in os.listdir(SOURCE) if f.endswith('.bil')]):
+
+    # Obtain list of files already inserted
+    cursor.execute('SELECT * FROM elevation_files_loaded;')
+    files_loaded = list(cursor)
+
+    if filename not in files_loaded: 
 
         # Notify user that we are looking at said file
         print("Inserting file %i/%i: %s" % (i, total, filename))
@@ -101,6 +108,13 @@ for filename in sorted(os.listdir(SOURCE)):
             # Execute said command
             cursor.execute(cmd)
 
+        # Add this file name to the list of files already added
+        cursor.execute("INSERT INTO elevation_files_loaded \
+                        VALUES (\'%s\');" % filename) 
+
+        # Commit all changes
+        connection.commit()
+
         # Notify the user of how long it took to insert the data
         print("Inserting the records took %i seconds" % (time.time() - t0))
 
@@ -108,3 +122,6 @@ for filename in sorted(os.listdir(SOURCE)):
         connection.commit()
 
         i += 1
+
+    else:
+        print("File: %s has already been loaded" % filename)

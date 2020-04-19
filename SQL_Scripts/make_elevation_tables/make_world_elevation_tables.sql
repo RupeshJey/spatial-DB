@@ -5,8 +5,17 @@
 
 DROP TABLE IF EXISTS elevation_rasters;
 DROP TABLE IF EXISTS elevation_points;
+DROP TABLE IF EXISTS elevation_files_loaded;
 
 -- CREATE TABLE statements
+
+-- elevation_files_loaded contains the names of all files that 
+-- have been imported already
+
+CREATE TABLE elevation_files_loaded (
+    -- File's name as length 100 varchar; must be unique
+    filename        VARCHAR(100)        PRIMARY KEY
+);
 
 -- elevation_rasters holds all elevation data in raster format
 
@@ -29,7 +38,7 @@ CREATE TABLE elevation_rasters (
 CREATE TABLE elevation_points (
 
     -- Unique point ID
-    point_id    SERIAL      NOT NULL,
+    point_id    BIGSERIAL   NOT NULL,
 
     -- Raster from which point came from
     rid         INTEGER     NOT NULL,

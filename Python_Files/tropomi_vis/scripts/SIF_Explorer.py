@@ -28,7 +28,8 @@ from bokeh.layouts import row, column               # For arranging view in grid
 # ZoomIn/OutTool:       For zooming in and out with clicks
 from bokeh.models import ColorBar, FixedTicker, DateRangeSlider, \
                          LassoSelectTool, Panel, LinearColorMapper, \
-                         ColumnDataSource, ZoomInTool, ZoomOutTool 
+                         ColumnDataSource, ZoomInTool, ZoomOutTool, \
+                         Range1d
 
 # To remove select time series
 from bokeh.models.renderers import GlyphRenderer
@@ -47,7 +48,9 @@ from bokeh.models import WMTSTileSource
 # Custom layers
 from custom_shapes_layer import Custom_Shapes_Layer
 from world_grid_2_degree_layer import US_World_Grid_2_Degree_Layer
+from world_grid_dynamic_layer import World_Grid_Dynamic_Layer
 from us_county_layer import US_County_Layer
+from us_county_ch4_layer import US_County_CH4_Layer
 from us_state_layer import US_State_Layer
 
 import numpy as np      # Converting lists to np lists (bugs out otherwise)
@@ -62,7 +65,7 @@ START_DATE_INIT = date(2018, 9, 1)
 END_DATE_INIT = date(2018, 9, 11)
 
 # Time series scale
-SIF_MIN, SIF_MAX = (-1.5, 4.0)
+SIF_MIN, SIF_MAX = (-1.5, 3.5)
 
 # Where the layers should be stored in serialization
 LAYERS_FILE = 'layers.dump'
@@ -80,13 +83,13 @@ def SIF_Explorer_tab():
     # Load from a save file
     if path.exists(LAYERS_FILE):
         with open(LAYERS_FILE, 'rb') as layers_file:
-            us_county_layer, us_state_layer, \
-            world_grid_2_degree_layer = pickle.load(layers_file)
+            us_county_layer, us_state_layer, world_grid_2_degree_layer = pickle.load(layers_file)
     # Load from scratch
     else:
         us_county_layer = US_County_Layer()
         us_state_layer = US_State_Layer()
         world_grid_2_degree_layer = US_World_Grid_2_Degree_Layer()
+        
         # Save the layers to file
         with open(LAYERS_FILE, 'wb') as layers_file:
             layers = (us_county_layer, \
@@ -95,6 +98,7 @@ def SIF_Explorer_tab():
 
     # Want the custom layer to be new every time
     custom_shapes_layer = Custom_Shapes_Layer()
+    world_grid_dynamic_layer = World_Grid_Dynamic_Layer()
 
     # Set the active layer to be the county layer
     active_layer = us_county_layer
@@ -169,6 +173,7 @@ def SIF_Explorer_tab():
             1 : us_state_layer,
             2 : us_county_layer,
             3 : world_grid_2_degree_layer,
+            4 : world_grid_dynamic_layer,
         }
 
         # Swap out the active layer
@@ -179,7 +184,8 @@ def SIF_Explorer_tab():
 
     # Define selection labels
     layer_selector = RadioButtonGroup(
-        labels=["Custom", "US States", "US Counties", "World"], active=2)
+        labels=["Custom", "US States", "US Counties", 
+                "World", "World (Dynamic)"], active=2)
 
     # Set up layer selection callback
     layer_selector.on_click(layer_selected)
@@ -276,13 +282,14 @@ def SIF_Explorer_tab():
         y_axis_type='mercator',
         plot_height = 900,
         plot_width = 1100,
-        output_backend="webgl")
+        output_backend="webgl",
+        x_range=Range1d(-20000000, 20000000, bounds = 'auto'))
 
     # Add the map!
     p.add_tile(tile_provider)
 
-    #p.lod_threshold = None          # No downsampling
-    p.lod_interval = 150
+    p.lod_threshold = None          # No downsampling
+    #p.lod_interval = 150
     p.toolbar.logo = None           # No logo
     p.grid.grid_line_color = None   # No grid
 
@@ -290,7 +297,8 @@ def SIF_Explorer_tab():
     p.hover.point_policy = "follow_mouse"
 
     # Color mapper
-    color_mapper = LinearColorMapper(palette=palette, low = -1, high = 3)
+    color_mapper = LinearColorMapper(palette=palette, 
+                                     low = SIF_MIN, high = SIF_MAX)
     color_transform = {'field': 'sifs', 'transform': color_mapper}
 
     # Patch all the information onto the map
@@ -311,8 +319,32 @@ def SIF_Explorer_tab():
     p.add_layout(color_bar, 'right')
 
     # Add zoom in / out tools
-    p.add_tools(ZoomInTool(factor=ZOOM_FACTOR))
-    p.add_tools(ZoomOutTool(factor=ZOOM_FACTOR))
+    zoom_in = ZoomInTool(factor=ZOOM_FACTOR)
+    zoom_out = ZoomOutTool(factor=ZOOM_FACTOR)
+
+    def range_changed(param, old, new):
+        if (type(active_layer) == World_Grid_Dynamic_Layer):
+            x1 = p.x_range.start
+            x2 = p.x_range.end
+            y1 = p.y_range.start
+            y2 = p.y_range.end
+            new_x1, new_y1 = to_lat_lon(y1, x1)
+            new_x2, new_y2 = to_lat_lon(y2, x2)
+            if (active_layer.range_changed(new_x1, new_y1, new_x2, new_y2)):
+                refresh_page()
+            #convert_shapes_to_mercator(np.array([[x1], [x2]]), 
+                                                      #np.array([[y1], [y2]]))
+
+            #print("(%s, %s) to (%s, %s)" % (x1, y1, x2, y2))
+            #40000000
+            #
+
+    # p.callback_policy = "throttle"
+    # p.callback_throttle = 200
+    p.x_range.on_change('end', range_changed)
+
+    p.add_tools(zoom_in)
+    p.add_tools(zoom_out)
 
     #################################
     # Set up custom plot data
@@ -327,6 +359,12 @@ def SIF_Explorer_tab():
     p.patches('x', 'y', source=custom_data_source,
                   line_color="darkslategray", line_width=1, 
                   fill_alpha=0.3, fill_color="lightgray")
+
+    # On geometry selection
+    # zoom = WheelZoomTool()
+    # p.on_event()
+    # p.add_tools(lasso)
+    # p.on_event(SelectionGeometry, shape_drawn)
 
     #################################
     # Set up time series
