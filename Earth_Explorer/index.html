@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+  
+  <!-- Prefatory matters... -->
+  <head>
+
+    <!-- <meta http-equiv='cache-control' content='no-cache'>
+    <meta http-equiv='expires' content='0'>
+    <meta http-equiv='pragma' content='no-cache'>
+
+
+    <meta property="twitter:card" content="summary">
+    <meta name="twitter:creator" content="@RupeshJeyaram">
+    <meta name="twitter:title" content="COVID-19 US Map">
+    <meta name="twitter:description" content="View US COVID-19 case numbers over time by county and state. Drag the date slider to visualize the spread of the disease since January.">
+    <meta name="twitter:image" content="http://covid19usmap.com/thumbnail.png">
+
+
+    <meta name="image" property="og:image" content="http://covid19usmap.com/thumbnail.png">
+    <meta name="author" content="Iman Wahle and Rupesh Jeyaram">
+    <meta property="og:image" content="thumbnail.png" />
+    <meta property="og:type" content="website"/>
+    <meta property="og:url" content="http://covid19usmap.com/" />
+    <meta property="og:title" content="COVID-19 US Map" />
+    <meta property="og:description" content="View US COVID-19 case numbers over time by county and state. Drag the date slider to visualize the spread of the disease since January." /> -->
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <!-- <script async src="https://www.googletagmanager.com/gtag/js?id=UA-162029622-1"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-162029622-1');
+    </script> -->
+
+    <title>Earth_Explorer</title>
+    <!-- <link href="style.css" type="text/css" rel="stylesheet" /> -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/v1.9.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v1.9.0/mapbox-gl.css" rel="stylesheet" />
+    <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.js"></script>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <!-- libraries for loading csv -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+    <!-- <script src="jquery-csv-master/src/jquery.csv.js"></script> -->
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/jqueryui-touch-punch/0.2.3/jquery.ui.touch-punch.min.js"></script>
+
+    <style>
+      html, body {overflow: hidden; background-color: #282828; height: 100%;font-family:arial;margin: 0px}
+      body { margin: 0px; padding: 0px; }
+      h1 {color: white; text-align: left; padding-left: 20px; font-size: 35pt; padding-top: 20px; margin: 0px}
+      h2 {color: white; text-align: left; padding-left: 20px; font-size: 20pt; padding-top: 20px}
+      h3 {color: white; text-align: left; padding-left: 20px; font-size: 15pt; padding-top: 10px}
+      .wrapper { 
+        overflow:hidden;
+        height: 100%;
+      }
+      .wrapper div {
+         padding: 0px;
+      }
+      #mapBox {background-color: #282828;height:100%; overflow:hidden; }
+      #map {background-color: #282828;height:97%; overflow:hidden; }
+      /*#sideBar {height: 100%; width: 400px;right: 0px; margin: 0px;}*/
+      #colorBar {display: inline-block; height:3%;width:100%; background-color: white;font-size: 0px;}
+      #stats {display: inline-block;right: 0; height:100%; background-color: #282828;float:right; width:400px; flex-direction: column;}
+      #settings {display: inline-block; width:400px;height:100%;right: 0px; vertical-align: top}
+      #topBar {display: inline-block; position: relative; width: 100%; height:24%;}
+      #name {display: inline-block; position: relative; width: 100%; height:30%; padding-left: 20px; font-size: 5vh;}
+      #confirmed {display: inline-block; position: relative; width: 49%; height:45%; vertical-align:top;font-size: 0; text-align: center; color: white; }
+      #confirmedCount {display: inline-block; position: relative; width: 100%; height:60%; padding: 0px; margin: 0px; font-size: 4vh; line-height: 7vh;}
+      #confirmedDescription {display: inline-block; position: relative; width: 100%; height:40%; padding: 0px; margin: 0px; font-size: 2vh; line-height: 3vh;}
+      #deaths {display: inline-block; position: relative; width: 50%; height:45%; color: red; text-align: center; border-left: 0.5px solid #555555}
+      #deathsCount {display: inline-block; position: relative; width: 100%; height:60%; padding: 0px; margin: 0px; font-size: 4vh; line-height: 7vh;}
+      #deathsDescription {display: inline-block; position: relative; width: 100%; height:40%; padding: 0px; margin: 0px; font-size: 2vh; line-height: 3vh;}
+      #date {color: #F0F0F0; font-size: 2.5vh;display: inline-block; position: relative; text-align: center; width: 100%; height: 17%;; line-height: 5vh;} 
+      #sliderBar {display: inline-block; position: relative; width: 100%; height:4%; background-color: transparent; text; margin: 0px; display: flex;align-items: center; justify-content: center;}
+      #slider {display: inline-block; position: relative; width: 70%; padding-right: 10px;}
+      
+      #toolBar {justify-content: center;}
+
+      #aggregateBar {display: inline-block; position: relative; width: 100%; height:7%; background-color: transparent; text-align: center; top-margin: 0px; color: white;}
+      #aggregate {display: block; position: relative; width: 100%; padding-left:0px; font-size: 1.7vh; border-color: #555555;border-style: solid; border-width: 1px 0px 0px 0px; text-align: center;}
+      #logBar {display: inline-block; position: relative; width: 100%; height:7%; background-color: transparent; text-align: center; top-margin: 0px; color: white; padding-top:0.5vh; padding-left:0px; font-size: 1.5vh;}
+      #log {display: block; position: relative; width: 100%; padding-left:0px; font-size: 1.7vh; border-color: #555555;border-style: solid; border-width: 1px 0px 0px 0px;  }
+      #scatters{display: inline-block; position: relative; width: 95%; height:50%; padding-bottom: 10px}
+      #cScatter {display: inline-block; position: relative; width: 100%; height: 50%;}
+      #dScatter {display: inline-block; position: relative; width: 100%; height: 50%;}
+      #confirmedScatter {display: inline-block; position: relative;}
+      #deathScatter {display: inline-block; position: relative;}
+      #bottomBar {padding-top: 1vh; padding-left: 10px;display: inline-block; position: relative; bottom: 0px; width: 90%; font-size: 1.3vh;color: #F0F0F0; display: flex; align-items: center; flex:1;}
+
+      #customLegend {
+        text-align: center;
+        margin: 0px;
+        padding-right: 0px;
+
+      }
+
+      .mapboxgl-popup {
+        height: 70px;
+        width: 130px;
+        /*padding-left: 10px;
+        padding-right: 10px;*/
+        text-align: center;
+        font-size: 1.5vh;
+        line-height: normal;
+        /*max-width: 400px;*/
+        /*font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;*/
+      }
+
+      .ui-widget-content .ui-state-default {background: #ABABAB; }
+      .ui-slider {
+          height: 0.4vh;
+          cursor: pointer;
+      }
+
+      .ui-slider .ui-slider-handle
+      {
+          cursor: pointer;
+      }
+
+      @media screen and (max-width: 800px) {
+        .wrapper {
+          display: flex; flex-direction: column-reverse;
+        }
+        #name { 
+          padding-top: 0.5vh;
+        }
+        #stats { 
+          float: none;
+          width:100%;
+          height:60%;
+        }
+        #settings {
+          width:100%;
+        }
+        #map {
+          height:100%;
+        }
+        #date {
+          display: none;
+        }
+        
+        #colorBar {
+          display: none;
+        }
+        #aggregateBar {
+          padding-top: 0px;
+          height:10%;
+        }
+        #aggregate {
+          padding-bottom: 0.2vh;
+        }
+        #log {
+          padding-bottom: 0px;
+        }
+        #bottomBar {
+          padding-top: 4px; 
+          font-size: 11px;
+          height:6%;
+        }
+
+        #scatters{display: inline-block; position: relative; width: 100%; height:30%; padding-bottom: 5px; font-size: 1vh}
+        #cScatter {display: inline-block; position: relative; width: 48%; height: 100%;}
+        #dScatter {display: inline-block; position: relative; width: 48%; height: 100%;}
+
+      }
+    </style>
+
+  </head>
+
+  <!-- Body of the webpage -->
+  <body>
+    <!-- <div class="wrapper"> -->
+
+      <!-- <div id="sideBar"> -->
+        <!-- <div id="colorBar"></div> -->
+        <!-- <div id="stats">
+          <div id="settings">
+            
+            <div id="topBar">
+              <h1 id="name">United States</h1><div id="confirmed">
+                <div id="confirmedCount"><b>---</b></div><div id="confirmedDescription"><b>Confirmed Cases</b></div>
+              </div><div id="deaths">
+                <div id="deathsCount"><b>---</b></div><div id="deathsDescription"><b>Deaths</b></div>
+              </div>
+              <div id="date"><b>Date</b></div>
+            </div>
+            
+
+            <div id="sliderBar">
+              <div id="slider">
+                <div id="custom-handle" class="ui-slider-handle"></div>
+              </div>
+            </div>
+            
+            
+            <div id="scatters">
+              <div id="cScatter"><canvas id="confirmedScatter" style="width:100%;height:50%;"></canvas></div>
+              <div id="dScatter"><canvas id="deathScatter" style="width:100%;height:50%;"></canvas></div>
+            </div>
+
+
+            <div id="toolBar"> 
+              <div id="aggregateBar">
+                <fieldset id="aggregate">
+                  <legend id="customLegend">Map</legend>
+                  
+
+                  <label for="mapLog">Log</label>
+                  <input type="checkbox" id="mapLog" name="mapLog" checked>
+                  
+                  <select class="select-css" id="selectAgg">
+                    <option value='states'>States</option>
+                    <option value='counties' selected>Counties</option>
+                  </select>
+
+                  <label for="selectMap"></label>
+                  <select class="select-css" id="selectMap">
+                    <option>Confirmed</option>
+                    <option>Confirmed Per 1M</option>
+                    <option>Deaths</option>
+                    <option>Deaths Per 1M</option>
+                  </select>
+                  
+                </fieldset>
+              </div>
+
+              <div id="logBar">
+                  <fieldset id="log">
+                    <legend id="customLegend" color="#FFFFFF">Charts</legend>
+                    <input type="checkbox" id="logBox" name="logBox">
+                    <label for="logBox">Log</label>
+
+                    <label for="selectChart"></label>
+                    <select class="select-css" id="selectChart">
+                      <option>Total</option>
+                      <option>Total Per 1M</option>
+                      <option>Per Day</option>
+                    </select>
+                  </fieldset>
+              </div>
+            </div>
+            
+            
+            <div id="bottomBar">
+              <div>
+                <b>Created by: <a href="mailto:support@covid19usmap.com" style="color:white">Rupesh Jeyaram & Iman Wahle</a>, Caltech 2020</b>
+                <br>
+                <b id="nytimes">Data: <a href="https://www.census.gov/data/datasets/time-series/demo/popest/2010s-counties-total.html" style="color:white">US Census</a> & <a href="https://www.nytimes.com/interactive/2020/us/coronavirus-us-cases.html" style="color:white">The New York Times</a>, as of </b>
+              </div>
+            </div>
+
+          </div>
+          
+          
+        </div> -->
+
+      <div id ="mapBox"><div id="map"></div><!-- <div id="colorBar"></div> --></div>
+
+
+      <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.4.2/mapbox-gl-geocoder.min.js"></script>
+      <link
+        rel="stylesheet"
+        href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.4.2/mapbox-gl-geocoder.css"
+        type="text/css"
+      />
+      <!-- Promise polyfill script required to use Mapbox GL Geocoder in IE 11 -->
+      <script src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.min.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.auto.min.js"></script>
+    <!-- </div> -->
+    
+  </body>
+
+  <script type="text/javascript" src="dataVisual.js"></script>
+</html>
