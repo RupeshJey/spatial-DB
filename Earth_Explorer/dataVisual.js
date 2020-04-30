@@ -5,8 +5,6 @@
 // and visualizing all the data, as well as setting
 // up all UI components defined in index.html
 
-const { Pool, Client } = require('pg')
-
 // Open IIFE
 var dataVisual = (function() {
 
@@ -24,6 +22,7 @@ var dataVisual = (function() {
         bounds: [[-127, 24.9493], [-65, 49.5904, ]]  // USA center
     });
 
+    // Add the geocoder (search bar)
     var geocoder = new MapboxGeocoder({
         accessToken: mapboxgl.accessToken,
         mapboxgl: mapboxgl,
@@ -31,31 +30,19 @@ var dataVisual = (function() {
         collapsed: true
     })
 
+    // Specify the map controls
     map.addControl(
         geocoder,
         'bottom-left'
     );
-
     map.addControl(new mapboxgl.NavigationControl({showCompass: false,
         showZoom: true}), 'bottom-left');
 
-    const client = new Client({
-      user: 'explorer',
-      host: '127.0.0.1',
-      password: 'outsider',
-      database: 'spatial_db',
-      port: 65432,
-    })
-
-    client.connect()
-
-    client.query('SELECT NOW() as now', (err, res) => {
-      if (err) {
-        console.log(err.stack)
-      } else {
-        console.log(res.rows[0])
-      }
-    })
+    // Get the shapes JSON
+    $.getJSON('http://tofu.gps.caltech.edu:5055/shapes?level=0', function(data) {
+        
+        console.log(data);
+    });
 
     // Return the dataVisual 'class'
     return dataVisual;
