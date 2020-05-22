@@ -39,7 +39,7 @@ var dataVisual = (function() {
         showZoom: true}), 'bottom-left');
 
     // Get the shapes JSON
-    $.getJSON('http://tofu.gps.caltech.edu:5055/shapes?level=0', function(data) {
+    $.getJSON('http://tofu.gps.caltech.edu:5055/package-lock.json', function(data) {
         
         console.log(data);
     });
